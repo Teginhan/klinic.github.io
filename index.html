@@ -1,0 +1,2103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Klinik Yönetim Otomasyonu</title>
+    <!-- Safari: stabil Tailwind v3 CDN (browser@4 iOS'ta sık kırılır) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            transition: background-color 0.25s ease, color 0.25s ease; 
+            -webkit-font-smoothing: antialiased; 
+            margin: 0;
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            padding-left: env(safe-area-inset-left, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* iOS Safari zoom engeli — sadece form alanları (tüm butonları bozma) */
+        input[type="text"], input[type="email"], input[type="password"],
+        input[type="tel"], input[type="number"], select, textarea,
+        .input-custom {
+            font-size: 16px !important;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        /* KLİNİK başlık butonu = OTOMASYONU punto */
+        button.title-klinik-btn {
+            font-size: 1.5rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.025em;
+            line-height: 1.2;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            color: inherit !important;
+            display: inline !important;
+            vertical-align: baseline;
+            font-family: inherit;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        @media (min-width: 768px) {
+            button.title-klinik-btn { font-size: 1.875rem !important; }
+        }
+        
+        body.modal-open { overflow: hidden; width: 100%; }
+        
+        .flatpickr-calendar {
+            font-size: 16px !important;
+            z-index: 99999 !important;
+        }
+        .flatpickr-day, .flatpickr-time input { font-size: 16px !important; }
+        
+        /* Safari: flex + hidden düzgün çalışsın */
+        .hidden { display: none !important; }
+
+        /* DARK MODE - Derin, kontrastlı gece paleti */
+        body.dark-mode { background-color: #0b0c0f; color: #e4e4e7; background-image: radial-gradient(circle at top left, rgba(220,38,38,0.06), transparent 40%), radial-gradient(circle at bottom right, rgba(59,130,246,0.05), transparent 45%); background-attachment: fixed; }
+        body.dark-mode .bg-card-custom { background-color: #17181c; }
+        body.dark-mode .border-custom { border-color: #2a2b31; }
+        body.dark-mode .table-head-custom { background-color: #131418; }
+        body.dark-mode .input-custom { background-color: #1e1f24; border-color: #33343b; color: #ffffff; }
+        body.dark-mode .text-title { color: #ffffff; }
+        body.dark-mode .bg-modal { background-color: #16171b; }
+        body.dark-mode .tab-active { background: linear-gradient(135deg, #dc2626, #b91c1c); color: #ffffff; box-shadow: 0 4px 14px -2px rgba(220,38,38,0.45); }
+        body.dark-mode .tab-inactive { background-color: #1c1d22; color: #9c9ca3; }
+
+        /* LIGHT MODE - Temiz, profesyonel slate paleti */
+        body.light-mode { background-color: #f4f6f9; color: #334155; background-image: radial-gradient(circle at top left, rgba(220,38,38,0.04), transparent 40%); background-attachment: fixed; }
+        body.light-mode .bg-card-custom { background-color: #ffffff; border-color: #e7ebf0; box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04); }
+        body.light-mode .border-custom { border-color: #e7ebf0; }
+        body.light-mode .table-head-custom { background-color: #f8fafc; color: #475569; }
+        body.light-mode .input-custom { background-color: #ffffff; border-color: #d6dce3; color: #0f172a; }
+        body.light-mode .input-custom:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,0.12); }
+        body.light-mode .text-title { color: #0f172a; }
+        body.light-mode .bg-modal { background-color: #ffffff; }
+        body.light-mode .tab-active { background: linear-gradient(135deg, #dc2626, #b91c1c); color: #ffffff; box-shadow: 0 4px 14px -2px rgba(220,38,38,0.35); }
+        body.light-mode .tab-inactive { background-color: #eef1f5; color: #64748b; }
+        body.light-mode td { color: #334155; }
+        body.light-mode th { color: #475569; }
+        body.light-mode .text-white { color: #0f172a !important; } 
+        body.light-mode .bg-zinc-900 { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+        body.light-mode .bg-zinc-950 { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+        body.light-mode .bg-zinc-950\/40 { background-color: #f1f5f9 !important; }
+
+        .input-custom { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        .input-custom:focus { outline: none; box-shadow: 0 0 0 3px rgba(220,38,38,0.15); }
+
+        .text-red-custom { color: #dc2626; }
+        .bg-red-custom { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .bg-red-custom:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); filter: brightness(1.02); }
+
+        @keyframes pulse-red {
+            0%, 100% { background-color: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.4); }
+            50% { background-color: rgba(220, 38, 38, 0.25); border-color: rgba(220, 38, 38, 0.8); }
+        }
+        .reminder-pulse { animation: pulse-red 2s infinite; }
+
+        /* Kartlara ve modallara hafif yükselme/gölge geçişi */
+        .bg-card-custom { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+        .card-hover:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -6px rgba(0,0,0,0.15); }
+
+        /* Mavi rengi ezen, hover durumunda gri ve kalın kalan özel buton stili */
+        .islem-link-btn {
+            font-weight: 600;
+            text-align: left;
+            transition: color 0.15s ease, font-weight 0.15s ease;
+        }
+        .islem-link-btn:hover {
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* Genel modern scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: rgba(120,120,130,0.4); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: rgba(120,120,130,0.6); }
+
+        /* Ajanda Özel Scrollbar */
+        .calendar-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .calendar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .calendar-scroll::-webkit-scrollbar-thumb { background-color: #52525b; border-radius: 10px; }
+        
+        /* Safari / iOS */
+        @supports (-webkit-touch-callout: none) {
+            .overflow-x-auto, .calendar-scroll {
+                -webkit-overflow-scrolling: touch;
+            }
+            #tabCalendarBtn, #tabRecordsBtn, #tabAppointmentsBtn {
+                min-height: 44px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+            }
+        }
+        
+        /* Küçük ekran (iPhone SE / 12 mini vb.) */
+        @media screen and (max-width: 390px) {
+            .text-2xl { font-size: 1.35rem !important; }
+            .text-3xl { font-size: 1.5rem !important; }
+            header .grid { gap: 0.4rem; }
+            header .min-w-\[110px\] { min-width: 90px; }
+        }
+        
+        /* Landscape iPhone */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+            #loginSection .max-w-sm { max-height: 95vh; overflow-y: auto; }
+            .fixed.inset-0 > div { max-height: 90vh; overflow-y: auto; }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/tr.js"></script>
+</head>
+<body class="dark-mode p-3 sm:p-4 md:p-8" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
+
+    <script>
+        if (/Instagram|FBAN|FBAV|Twitter|WebView/i.test(navigator.userAgent)) {
+            alert("⚠️ En iyi performans için lütfen tarayıcınızın sağ üst menüsünden 'Tarayıcıda Aç' (Chrome/Safari) seçeneğini kullanın.");
+        }
+    </script>
+
+    <datalist id="islemlerListesi">
+        <option value="Muayene / Genel Kontrol">
+        <option value="Kompozit Dolgu">
+        <option value="Kanal Tedavisi (Endodonti)">
+        <option value="Diş Çekimi">
+        <option value="Gömülü Diş Operasyonu">
+        <option value="Diş Taşı Temizliği (Detertraj)">
+        <option value="Zirkonyum Kaplama">
+        <option value="Porselen Kron Köprü">
+        <option value="İmplant Tedavisi">
+        <option value="Diş Beyazlatma (Bleaching)">
+        <option value="Panoramik Röntgen Çekimi">
+        <option value="Ortodonti Kontrolü">
+    </datalist>
+
+    <div id="loginSection" class="fixed inset-0 bg-zinc-950 flex items-center justify-center p-4 z-50" style="background-image: radial-gradient(circle at 30% 20%, rgba(220,38,38,0.12), transparent 45%), radial-gradient(circle at 80% 80%, rgba(59,130,246,0.08), transparent 40%);">
+        <div class="bg-zinc-900 border border-zinc-800 p-7 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl relative">
+            <div class="text-center">
+                <div class="text-3xl mb-2">🦷</div>
+                <h2 class="text-xl font-extrabold tracking-wide text-white">KLİNİK SİSTEMİ <span class="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-rose-500">GİRİŞİ</span></h2>
+                <p class="text-xs text-gray-500 mt-1">Lütfen e-posta ve şifrenizle giriş yapın</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-Posta</label>
+                    <input type="email" id="loginEmail" required class="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 transition">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Şifre</label>
+                    <input type="password" id="loginPassword" required class="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 transition">
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-red-900/30 transition">Sisteme Giriş Yap</button>
+            </form>
+            <div id="loginError" class="text-center text-xs text-red-500 hidden font-semibold"></div>
+        </div>
+    </div>
+
+    <div id="appSection" class="hidden max-w-7xl mx-auto">
+        <header class="flex flex-col lg:flex-row justify-between items-center mb-6 pb-5 border-b border-custom gap-4">
+            <div class="flex justify-between items-center w-full lg:w-auto">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-title">
+                        <button type="button" onclick="showFinancePage()" class="title-klinik-btn cursor-pointer hover:opacity-80 transition active:scale-95" title="Aylık Gelir-Gider Raporu">
+                            KLİNİK
+                        </button>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-rose-600">OTOMASYONU</span>
+                    </h1>
+                    <p class="text-xs text-gray-400 mt-1 font-medium">Bulut Tabanlı Hasta Takip ve Finans Sistemi</p>
+                </div>
+                <div class="flex items-center gap-2 lg:hidden">
+                    <button onclick="toggleTheme()" id="themeToggleMobile" class="p-2 rounded-xl bg-card-custom border border-custom text-sm shadow-sm">🌙</button>
+                    <button onclick="handleLogout()" class="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-500 font-bold">Çıkış</button>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 w-full lg:w-auto">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full lg:w-auto text-center text-xs">
+                    <div class="card-hover bg-card-custom p-3 rounded-xl border border-custom min-w-[110px]">
+                        <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">💰 Bugünkü Ciro</span>
+                        <span id="statTotalCiro" class="text-sm font-extrabold text-title">0.00 TL</span>
+                    </div>
+                    <div class="card-hover bg-card-custom p-3 rounded-xl border border-custom min-w-[110px]">
+                        <span class="block text-[9px] text-red-400 font-bold uppercase tracking-wider mb-0.5">🩺 Bugün Sümeyye</span>
+                        <span id="statDocA" class="text-sm font-extrabold text-red-custom">0.00 TL</span>
+                    </div>
+                    <div class="card-hover bg-card-custom p-3 rounded-xl border border-custom min-w-[110px]">
+                        <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">🩺 Bugün Murat</span>
+                        <span id="statDocB" class="text-sm font-extrabold text-gray-500 dark:text-gray-300">0.00 TL</span>
+                    </div>
+                    <div class="card-hover bg-card-custom p-3 rounded-xl border border-red-900/30 min-w-[120px] bg-gradient-to-br from-red-500/5 to-transparent">
+                        <span class="block text-[9px] text-amber-500 font-bold uppercase tracking-wider mb-0.5">📈 Bu Ayki Ciro</span>
+                        <span id="statAylikCiro" class="text-sm font-extrabold text-emerald-600 dark:text-emerald-500">0.00 TL</span>
+                    </div>
+                </div>
+                <button onclick="toggleTheme()" id="themeToggleDesktop" class="hidden lg:block p-3 rounded-xl border border-custom bg-card-custom hover:bg-zinc-500/10 transition text-sm shadow-sm">🌙</button>
+                <button onclick="handleLogout()" class="hidden lg:block p-3 rounded-xl border border-red-900/30 bg-red-500/5 hover:bg-red-500/10 text-xs text-red-500 font-bold transition">Çıkış Yap</button>
+            </div>
+        </header>
+
+        <!-- ANA İÇERİK (hasta kayıtları, randevu, ajanda) -->
+        <div id="mainAppContent">
+
+        <div id="appointmentReminderPanel" class="hidden reminder-pulse border p-4 rounded-xl mb-4 text-xs md:text-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-2 shadow-md">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">⏰</span>
+                <div>
+                    <h4 class="font-bold text-red-500 uppercase tracking-wide">Kritik Randevu Hatırlatması!</h4>
+                    <p id="reminderText" class="text-gray-500 dark:text-gray-400 text-xs mt-0.5">Yaklaşan randevular var!</p>
+                </div>
+            </div>
+            <button onclick="switchTab('appointments')" class="px-3 py-1.5 bg-red-custom text-white font-bold text-xs rounded-lg hover:bg-red-600 transition shadow">Randevulara Git</button>
+        </div>
+
+        <div class="flex gap-2 mb-4">
+            <button id="tabCalendarBtn" onclick="switchTab('calendar')" class="px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-inactive">📅 Haftalık Ajanda</button>
+            <button id="tabRecordsBtn" onclick="switchTab('records')" class="px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-active">📋 Hasta Kayıtları</button>
+            <button id="tabAppointmentsBtn" onclick="switchTab('appointments')" class="px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-inactive">🗓️ Randevu Sistemi <span id="badgeAppointmentCount" class="ml-1 px-1.5 py-0.2 text-[9px] bg-zinc-700 text-white rounded-full hidden">0</span></button>
+        </div>
+
+        <div class="bg-card-custom p-4 rounded-b-xl rounded-tr-xl border border-custom mb-6 space-y-4 shadow-sm">
+            <div class="flex flex-col md:flex-row gap-3 justify-between items-center">
+                <div class="w-full md:w-72 relative">
+                    <input type="text" id="searchBar" oninput="searchData()" placeholder="🔍 Hasta adına göre canlı ara..." class="w-full input-custom rounded-xl px-3 py-2.5 text-xs focus:outline-none">
+                </div>
+                <div class="w-full md:w-auto flex flex-wrap items-center justify-end gap-2">
+                    <div id="recordFilterGroup" class="flex gap-1 bg-zinc-500/10 p-1 rounded-xl">
+                        <button onclick="setFilter('all')" id="btnFilterAll" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-custom text-white transition">Tümü</button>
+                        <button onclick="setFilter('daily')" id="btnFilterDaily" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-500 hover:bg-zinc-500/20 transition">Bugün</button>
+                        <button onclick="setFilter('weekly')" id="btnFilterWeekly" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-500 hover:bg-zinc-500/20 transition">Bu Hafta</button>
+                    </div>
+                    <div class="h-6 w-[1px] bg-zinc-300 dark:bg-zinc-700 hidden md:block mx-1" id="dividerLine"></div>
+                    <div class="flex gap-2">
+                        <button onclick="exportToExcel()" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-zinc-500/10 border border-custom text-emerald-600 dark:text-emerald-500 hover:bg-zinc-500/20 transition">📊 Excel</button>
+                        <button onclick="exportToPDF()" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-zinc-500/10 border border-custom text-red-500 hover:bg-zinc-500/20 transition">📄 PDF</button>
+                        <button onclick="openAppointmentModalWithData()" id="actionSecondaryBtn" class="hidden px-4 py-1.5 text-xs font-bold rounded-xl bg-zinc-500/10 border border-custom text-title hover:bg-zinc-500/20 transition shadow-sm">🗓️ Randevu Oluştur</button>
+                        <button onclick="openMainModal()" id="actionPrimaryBtn" class="px-4 py-1.5 text-xs font-bold rounded-xl bg-red-custom text-white hover:bg-red-600 transition shadow-md">➕ Yeni Kayıt</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CALENDAR VIEW SECTION -->
+        <div id="calendarViewSection" class="hidden bg-card-custom rounded-xl border border-custom shadow-sm overflow-hidden flex flex-col mb-6">
+            <div id="calendarToolbar" class="flex items-center gap-3 p-4 bg-zinc-500/5 border-b border-custom justify-between md:justify-start flex-wrap md:flex-nowrap">
+                <button onclick="changeWeek(-1)" class="px-3 py-1.5 rounded-xl bg-zinc-500/10 hover:bg-zinc-500/20 text-xs font-bold text-title transition border border-custom">⬅️ Önceki</button>
+                <span id="calendarWeekLabel" class="text-sm font-bold text-title tracking-wide bg-zinc-500/10 px-4 py-1.5 rounded-xl border border-custom whitespace-nowrap">06 - 12 Nisan 2026</span>
+                <button onclick="changeWeek(1)" class="px-3 py-1.5 rounded-xl bg-zinc-500/10 hover:bg-zinc-500/20 text-xs font-bold text-title transition border border-custom">Sonraki ➡️</button>
+                <button onclick="jumpToToday()" class="hidden md:block px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 text-xs font-bold transition border border-blue-500/20">Bugün</button>
+            </div>
+            <div class="overflow-x-auto calendar-scroll flex-1">
+                <div class="min-w-[800px]" id="calendarRenderArea">
+                    <!-- Javascript ile dinamik ızgara çizilecek -->
+                </div>
+            </div>
+            <div class="p-3 border-t border-custom bg-zinc-500/5 flex gap-4 justify-center text-[10px] font-bold text-gray-400">
+                <span class="flex items-center gap-1"><div class="w-3 h-3 rounded bg-amber-500/50 border border-amber-500"></div> Bekleyen Randevu</span>
+                <span class="flex items-center gap-1"><div class="w-3 h-3 rounded bg-emerald-500/50 border border-emerald-500"></div> Tamamlanmış İşlem</span>
+            </div>
+        </div>
+
+        <div id="recordsViewSection" class="space-y-4">
+            <div class="bg-card-custom rounded-xl border border-custom overflow-hidden shadow-sm">
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full text-left border-collapse table-fixed">
+                        <colgroup>
+                            <col style="width: 8%">
+                            <col style="width: 6%">
+                            <col style="width: 14%">
+                            <col style="width: 10%">
+                            <col style="width: 7%">
+                            <col style="width: 7%">
+                            <col style="width: 6%">
+                            <col style="width: 8%">
+                            <col style="width: 8%">
+                            <col style="width: 10%">
+                            <col style="width: 16%">
+                        </colgroup>
+                        <thead>
+                            <tr class="table-head-custom border-b border-custom text-xs font-semibold uppercase tracking-wider">
+                                <th class="p-3">Başlangıç</th>
+                                <th class="p-3">Bitiş</th>
+                                <th class="p-3">Hasta Bilgisi</th>
+                                <th class="p-3">Yapılan İşlem</th>
+                                <th class="p-3">Ödeme</th>
+                                <th class="p-3 text-right">Ödenen</th>
+                                <th class="p-3 text-right">Gider</th>
+                                <th class="p-3 text-right text-red-custom">Sümeyye Payı</th>
+                                <th class="p-3 text-right">Murat Payı</th>
+                                <th class="p-3">Açıklama</th>
+                                <th class="p-3 text-center">Aksiyon</th>
+                            </tr>
+                        </thead>
+                        <tbody id="desktopTableBody" class="divide-y divide-zinc-500/10 text-xs md:text-sm"></tbody>
+                    </table>
+                </div>
+                <div id="mobileCardsContainer" class="block md:hidden p-4 space-y-3"></div>
+            </div>
+        </div>
+
+        <div id="appointmentsViewSection" class="hidden space-y-4">
+            <div class="bg-card-custom rounded-xl border border-custom overflow-hidden shadow-sm">
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full text-left border-collapse table-fixed">
+                        <colgroup>
+                            <col style="width: 13%">
+                            <col style="width: 12%">
+                            <col style="width: 13%">
+                            <col style="width: 17%">
+                            <col style="width: 14%">
+                            <col style="width: 16%">
+                            <col style="width: 15%">
+                        </colgroup>
+                        <thead>
+                            <tr class="table-head-custom border-b border-custom text-xs font-semibold uppercase tracking-wider">
+                                <th class="p-3">Başlangıç Zamanı</th>
+                                <th class="p-3">Kalan Süre</th>
+                                <th class="p-3">Bitiş Zamanı</th>
+                                <th class="p-3">Hasta Adı</th>
+                                <th class="p-3">İletişim</th>
+                                <th class="p-3">Planlanan İşlem</th>
+                                <th class="p-3 text-center">Aksiyon</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointmentsTableBody" class="divide-y divide-zinc-500/10 text-xs md:text-sm"></tbody>
+                    </table>
+                </div>
+                <div id="mobileAppointmentsContainer" class="block md:hidden p-4 space-y-3"></div>
+            </div>
+        </div>
+
+        <div id="paginationContainer" class="flex justify-between items-center bg-card-custom px-4 py-3 border border-custom rounded-xl mt-4 shadow-sm text-xs">
+            <div class="text-gray-500 dark:text-gray-400">Toplam <span id="pageTotalItems" class="font-bold text-title">0</span> kayıttan <span id="pageRange" class="font-bold text-title">0-0</span> arası gösteriliyor.</div>
+            <div class="flex gap-2">
+                <button onclick="changePage(-1)" id="btnPrevPage" class="px-3 py-1.5 rounded border border-custom bg-zinc-500/10 text-title hover:bg-zinc-500/20 disabled:opacity-40 disabled:pointer-events-none transition font-medium">⬅️ Önceki</button>
+                <button onclick="changePage(1)" id="btnNextPage" class="px-3 py-1.5 rounded border border-custom bg-zinc-500/10 text-title hover:bg-zinc-500/20 disabled:opacity-40 disabled:pointer-events-none transition font-medium">Sonraki ➡️</button>
+            </div>
+        </div>
+
+        <div id="noDataMessage" class="hidden text-center py-12 text-gray-500 dark:text-gray-400 text-sm italic bg-card-custom border border-custom rounded-xl shadow-sm">Kayıt bulunamadı.</div>
+        </div><!-- /mainAppContent -->
+
+        <!-- FİNANS RAPORU SAYFASI -->
+        <div id="financeViewSection" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                <div>
+                    <h2 class="text-lg md:text-xl font-extrabold text-title tracking-tight">📊 Aylık Gelir · Gider · Kâr</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Kayıt verilerinden otomatik hesaplanan özet tablo</p>
+                </div>
+                <button type="button" onclick="hideFinancePage()" class="px-4 py-2.5 text-xs font-bold rounded-xl bg-red-custom text-white hover:bg-red-600 transition shadow-md inline-flex items-center gap-2 self-start sm:self-auto">
+                    🏠 Ana Sayfa
+                </button>
+            </div>
+
+            <!-- Özet kartlar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div class="bg-card-custom p-3 rounded-xl border border-custom card-hover">
+                    <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">💰 Toplam Gelir</span>
+                    <span id="finTotalGelir" class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">0.00 TL</span>
+                </div>
+                <div class="bg-card-custom p-3 rounded-xl border border-custom card-hover">
+                    <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">📉 Toplam Gider</span>
+                    <span id="finTotalGider" class="text-sm font-extrabold text-amber-600 dark:text-amber-400">0.00 TL</span>
+                </div>
+                <div class="bg-card-custom p-3 rounded-xl border border-custom card-hover">
+                    <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">📈 Toplam Kâr</span>
+                    <span id="finTotalKar" class="text-sm font-extrabold text-title">0.00 TL</span>
+                </div>
+                <div class="bg-card-custom p-3 rounded-xl border border-custom card-hover">
+                    <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">🗓️ Seçili Yıl</span>
+                    <select id="financeYearSelect" onchange="renderFinanceTable()" class="mt-0.5 w-full input-custom rounded-lg px-2 py-1 text-xs font-bold text-title focus:outline-none"></select>
+                </div>
+            </div>
+
+            <div class="bg-card-custom rounded-xl border border-custom overflow-hidden shadow-sm">
+                <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch;">
+                    <table class="w-full text-left border-collapse min-w-[640px]">
+                        <thead>
+                            <tr class="table-head-custom border-b border-custom text-xs font-semibold uppercase tracking-wider">
+                                <th class="p-3">Ay</th>
+                                <th class="p-3 text-right">Gelir (TL)</th>
+                                <th class="p-3 text-right">Gider (TL)</th>
+                                <th class="p-3 text-right">Kâr (TL)</th>
+                                <th class="p-3 text-right text-red-custom">Sümeyye</th>
+                                <th class="p-3 text-right">Murat</th>
+                                <th class="p-3 text-center">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="financeTableBody" class="divide-y divide-zinc-500/10 text-xs md:text-sm"></tbody>
+                        <tfoot>
+                            <tr class="table-head-custom border-t-2 border-custom font-bold text-xs">
+                                <td class="p-3 uppercase tracking-wide">Yıllık Toplam</td>
+                                <td class="p-3 text-right text-emerald-600 dark:text-emerald-400" id="finFootGelir">0.00</td>
+                                <td class="p-3 text-right text-amber-600 dark:text-amber-400" id="finFootGider">0.00</td>
+                                <td class="p-3 text-right text-title" id="finFootKar">0.00</td>
+                                <td class="p-3 text-right text-red-500" id="finFootDocA">0.00</td>
+                                <td class="p-3 text-right" id="finFootDocB">0.00</td>
+                                <td class="p-3 text-center" id="finFootCount">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div id="financeEmptyMsg" class="hidden text-center py-10 text-gray-500 text-sm italic">Bu yıla ait kayıt bulunamadı.</div>
+            </div>
+
+            <p class="text-[10px] text-gray-400 text-center">Gelir = ödenen tutarlar · Gider = diğer giderler · Kâr = Gelir − Gider</p>
+        </div>
+    </div>
+
+    <div id="recordModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+        <div class="bg-modal border border-custom rounded-t-2xl sm:rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col" style="padding-bottom: env(safe-area-inset-bottom);">
+            <div class="bg-gradient-to-r from-red-500/10 via-transparent to-transparent p-4 border-b border-custom flex justify-between items-center shrink-0">
+                <h3 id="modalTitle" class="text-sm font-bold text-title tracking-wide uppercase">YENİ HASTA KAYDI</h3>
+                <button onclick="closeModal('recordModal')" class="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 text-xl font-bold transition">&times;</button>
+            </div>
+            <form id="recordForm" onsubmit="saveRecord(event)" class="p-4 space-y-3 overflow-y-auto flex-1" style="-webkit-overflow-scrolling: touch;">
+                <input type="hidden" id="editingRecordId">
+                <input type="hidden" id="convertedFromAppId">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Başlangıç Tarihi *</label>
+                        <input type="text" id="recordTarih" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Bitiş Tarihi</label>
+                        <input type="text" id="recordBitis" placeholder="Seçilmezse +15dk" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Hasta Adı Soyadı *</label>
+                        <input type="text" id="hastaAdi" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Telefon Numarası</label>
+                        <input type="tel" id="hastaTelefon" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="05xxxxxxxxx" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">TC Kimlik No</label>
+                        <input type="text" id="hastaTc" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="11 Haneli TC" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Doğum Tarihi</label>
+                        <input type="text" id="dogumTarihi" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Yapılan İşlem *</label>
+                    <input type="text" id="yapilanIslem" list="islemlerListesi" required placeholder="İşlem seçin veya yazın..." class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Ödeme Tipi</label>
+                        <select id="odemeTipi" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                            <option value="Nakit">Nakit</option>
+                            <option value="Kredi Kartı">Kredi Kartı</option>
+                            <option value="IBAN">IBAN</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Ödenen Miktar (TL) *</label>
+                        <input type="number" step="0.01" min="0" id="odenenMiktar" onkeypress="return event.charCode >= 48 && event.charCode <= 57 || event.charCode == 44 || event.charCode == 46" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Diğer Giderler (TL)</label>
+                    <input type="number" step="0.01" min="0" id="digerGiderler" value="0" onkeypress="return event.charCode >= 48 && event.charCode <= 57 || event.charCode == 44 || event.charCode == 46" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Açıklama / Klinik Notlar</label>
+                    <textarea id="aciklama" rows="3" placeholder="Hastaya dair seans notları veya detaylı açıklamalar..." class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none"></textarea>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button type="button" onclick="closeModal('recordModal')" class="flex-1 py-2.5 text-sm font-semibold rounded-xl transition shadow-sm bg-zinc-500/10 text-gray-500 dark:text-gray-400">İptal</button>
+                    <button type="submit" class="flex-1 py-2.5 text-sm font-semibold rounded-xl transition shadow-sm bg-red-custom text-white">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="appointmentModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+        <div class="bg-modal border border-custom rounded-t-2xl sm:rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col" style="padding-bottom: env(safe-area-inset-bottom);">
+            <div class="bg-gradient-to-r from-red-500/10 via-transparent to-transparent p-4 border-b border-custom flex justify-between items-center shrink-0">
+                <h3 id="appointmentModalTitle" class="text-sm font-bold text-title tracking-wide uppercase">YENİ RANDEVU OLUŞTUR</h3>
+                <button onclick="closeModal('appointmentModal')" class="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 text-xl font-bold transition">&times;</button>
+            </div>
+            <form id="appointmentForm" onsubmit="saveAppointment(event)" class="p-4 space-y-4 overflow-y-auto flex-1" style="-webkit-overflow-scrolling: touch;">
+                <input type="hidden" id="editingAppId">
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Hasta Adı Soyadı *</label>
+                    <input type="text" id="appHastaAdi" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">TC Kimlik No</label>
+                        <input type="text" id="appHastaTc" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="11 Haneli TC" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Doğum Tarihi</label>
+                        <input type="text" id="appDogumTarihi" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">İletişim Numarası *</label>
+                    <input type="tel" id="appIletisim" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="05xxxxxxxxx" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Başlangıç Zamanı *</label>
+                        <input type="text" id="appTarih" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Bitiş Zamanı</label>
+                        <input type="text" id="appBitis" placeholder="Seçilmezse +15dk" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Planlanan İşlem</label>
+                    <input type="text" id="appIslem" list="islemlerListesi" placeholder="Planlanan işlemi seçin veya yazın..." class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeModal('appointmentModal')" class="flex-1 py-2.5 text-sm font-semibold rounded-xl transition shadow-sm bg-zinc-500/10 text-gray-500 dark:text-gray-400">İptal</button>
+                    <button type="submit" class="flex-1 py-2.5 text-sm font-semibold rounded-xl transition shadow-sm bg-red-custom text-white">Randevuyu Kaydet</button>
+                    <button type="button" id="convertAppBtn" onclick="convertAppointmentToRecord()" class="flex-1 py-2.5 text-sm font-semibold rounded-xl transition shadow-sm bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">💊 Muayeneye Al</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="slotChoiceModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-modal border border-custom rounded-2xl max-w-xs w-full overflow-hidden shadow-2xl">
+            <div class="bg-gradient-to-r from-red-500/10 via-transparent to-transparent p-4 border-b border-custom flex justify-between items-center">
+                <h3 class="text-sm font-bold text-title tracking-wide uppercase">Ne Oluşturmak İstersiniz?</h3>
+                <button onclick="closeModal('slotChoiceModal')" class="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 text-xl font-bold transition">&times;</button>
+            </div>
+            <div class="p-4 space-y-3">
+                <p id="slotChoiceLabel" class="text-xs text-center text-gray-400 font-semibold"></p>
+                <button onclick="openAppointmentFromCalendar(pendingSlotDateTime)" class="w-full py-2.5 text-sm font-bold rounded-xl bg-red-custom text-white hover:bg-red-600 transition">🗓️ Randevu Oluştur</button>
+                <button onclick="openRecordFromCalendar(pendingSlotDateTime)" class="w-full py-2.5 text-sm font-bold rounded-xl bg-zinc-500/10 border border-custom text-title hover:bg-zinc-500/20 transition">📋 Hasta Kaydı Oluştur</button>
+                <button onclick="openMuayeneModal(pendingSlotDateTime)" class="w-full py-2.5 text-sm font-bold rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition">💊 Muayeneye Al</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-modal border border-custom rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="bg-red-custom p-4 flex justify-between items-center text-white">
+                <h3 id="detailModalTitle" class="text-sm font-bold tracking-wider uppercase">📋 DETAY GÖRÜNÜMÜ</h3>
+                <button onclick="closeModal('detailModal')" class="text-white hover:text-black text-xl font-bold transition">&times;</button>
+            </div>
+            <div class="p-6">
+                <p id="detailModalText" class="text-sm leading-relaxed whitespace-pre-wrap text-title bg-zinc-500/5 p-4 rounded border border-custom max-h-60 overflow-y-auto font-medium"></p>
+                <div class="mt-4 flex justify-end">
+                    <button onclick="closeModal('detailModal')" class="px-4 py-2 text-xs font-bold bg-zinc-500/20 text-title rounded hover:bg-zinc-500/30 transition">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="recordChoiceModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-modal border border-custom rounded-2xl w-full max-w-sm max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
+            <div class="bg-gradient-to-r from-red-500/10 via-transparent to-transparent p-3 border-b border-custom flex justify-between items-center shrink-0">
+                <h3 class="text-xs font-bold text-title tracking-wide uppercase">KAYIT DETAYLARI</h3>
+                <button onclick="closeModal('recordChoiceModal')" class="w-6 h-6 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 text-lg font-bold transition">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1">
+                <p id="recordDetailContent" class="text-[11px] leading-relaxed text-title whitespace-pre-wrap bg-zinc-500/5 p-3 rounded border border-custom font-medium"></p>
+            </div>
+            <div class="border-t border-custom p-3 shrink-0 flex gap-2 bg-zinc-500/5">
+                <button onclick="editRecordFromChoice(pendingRecordId)" class="flex-1 py-2 text-xs font-bold rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/30 transition">✏️ Düzenle</button>
+                <button onclick="createAppointmentFromRecord(pendingRecordId)" class="flex-1 py-2 text-xs font-bold rounded-lg bg-red-custom text-white hover:bg-red-600 transition">🗓️ Randevu</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Bağlantı ve Kimlik Bilgileri
+        const SUPABASE_URL = "https://hxrzbofthqdpxmjmtmww.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4cnpib2Z0aHFkcHhtam10bXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNzAzOTQsImV4cCI6MjA5ODk0NjM5NH0.FsaU9wBj1aDIN2YOgbvIKqhX4JIF6UP4tAD7cOpLEXE";
+
+        // Safari: script yüklenmeden createClient çağrılırsa hata veriyordu
+        let dbClient = null;
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+            dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true,
+                    storage: window.localStorage,
+                    storageKey: 'sb-hxrzbofthqdpxmjmtmww-auth-token'
+                }
+            });
+        } else {
+            console.error('Supabase yüklenemedi. İnternet veya CDN engeli olabilir.');
+            setTimeout(function() {
+                var err = document.getElementById('loginError');
+                if (err) {
+                    err.innerText = 'Bağlantı hatası: Supabase yüklenemedi. Safari Ayarlar > İçerik Engelleyicileri kapalı olsun ve dosyayı bir web sunucusundan (https) açın.';
+                    err.classList.remove('hidden');
+                }
+            }, 500);
+        }
+
+        // Safari tarih ayrıştırma: "2026-04-06 11:30" → ISO
+        function parseSafeDate(val) {
+            if (!val) return new Date(NaN);
+            if (val instanceof Date) return val;
+            var s = String(val).trim();
+            // Flatpickr "Y-m-d H:i" Safari'de Invalid Date verir
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
+                s = s.replace(' ', 'T') + (s.length === 16 ? ':00' : '');
+            }
+            // Sadece tarih
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                s = s + 'T12:00:00';
+            }
+            var d = new Date(s);
+            if (isNaN(d.getTime())) {
+                // Son çare: parçala
+                var m = String(val).match(/(\d{4})-(\d{2})-(\d{2})[ T]?(\d{2})?:?(\d{2})?/);
+                if (m) {
+                    d = new Date(
+                        parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10),
+                        parseInt(m[4]||'0',10), parseInt(m[5]||'0',10), 0
+                    );
+                }
+            }
+            return d;
+        }
+
+        function toSafeISO(val) {
+            var d = parseSafeDate(val);
+            if (isNaN(d.getTime())) d = new Date();
+            return d.toISOString();
+        }
+
+        // Global Değişkenler
+        let records = [];
+        let appointments = [];
+        let currentFilter = 'all';
+        let activeTab = 'records';
+        let searchQuery = '';
+        let currentPage = 1;
+        let pendingSlotDateTime = null;
+        let pendingRecordId = null;
+        const itemsPerPage = 10;
+        let currentTheme = 'dark';
+        try { currentTheme = localStorage.getItem('klinik_theme') || 'dark'; } catch (e) { currentTheme = 'dark'; }
+        let realtimeChannel = null;
+
+        document.body.className = currentTheme + '-mode';
+        try { updateThemeButtons(); } catch (e) {}
+
+        async function checkExistingSession() {
+            if (!dbClient) return;
+            try {
+                const { data: { session } } = await dbClient.auth.getSession();
+                if (session) {
+                    handleAuthSuccess();
+                }
+            } catch (err) {
+                console.error('Oturum kontrolü hatası:', err);
+            }
+        }
+        if (dbClient) checkExistingSession();
+
+        if (dbClient) {
+            dbClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    handleAuthSuccess();
+                } else {
+                    document.getElementById('loginSection').classList.remove('hidden');
+                    document.getElementById('appSection').classList.add('hidden');
+                }
+            });
+        }
+
+        function handleAuthSuccess() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('appSection').classList.remove('hidden');
+            fetchDataFromCloud();
+            setupRealtimeListeners();
+            if (window.reminderInterval) clearInterval(window.reminderInterval);
+            window.reminderInterval = setInterval(checkAppointmentReminders, 30000);
+            checkAppointmentReminders();
+        }
+
+        function setupRealtimeListeners() {
+            if (!dbClient || realtimeChannel) return;
+
+            realtimeChannel = dbClient
+                .channel('schema-db-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'records' }, (payload) => {
+                    fetchDataFromCloud();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, (payload) => {
+                    fetchDataFromCloud();
+                });
+                
+            realtimeChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') console.log("Realtime aktif.");
+            });
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.classList.add('hidden');
+            errorDiv.innerText = '';
+
+            if (!dbClient) {
+                errorDiv.innerText = 'Sistem bağlantısı kurulamadı. İnternet bağlantınızı kontrol edin ve sayfayı yenileyin.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            var submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Giriş yapılıyor...';
+            }
+
+            try {
+                const { data, error } = await dbClient.auth.signInWithPassword({ email: email.trim(), password: password });
+                if (error) {
+                    errorDiv.innerText = "Giriş Başarısız: " + (error.message || 'Bilinmeyen hata');
+                    errorDiv.classList.remove('hidden');
+                } else if (data && data.session) {
+                    handleAuthSuccess();
+                }
+            } catch (err) {
+                errorDiv.innerText = "Bağlantı hatası: " + (err.message || String(err)) + ". Safari'de dosyayı https üzerinden açın.";
+                errorDiv.classList.remove('hidden');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Sisteme Giriş Yap';
+                }
+            }
+        }
+
+        async function handleLogout() {
+            try {
+                if (dbClient) await dbClient.auth.signOut();
+            } catch (e) {}
+            try { localStorage.removeItem('sb-hxrzbofthqdpxmjmtmww-auth-token'); } catch (e) {}
+            location.reload();
+        }
+
+        async function fetchDataFromCloud() {
+            if (!dbClient) return;
+            try {
+            const { data: recData, error: recErr } = await dbClient.from('records').select('*').order('created_at', { ascending: false });
+            const { data: appData, error: appErr } = await dbClient.from('appointments').select('*').order('tarih', { ascending: true });
+            if (recErr) console.error('records hata:', recErr);
+            if (appErr) console.error('appointments hata:', appErr);
+            
+            records = recData || [];
+            appointments = appData || [];
+            renderData();
+            
+            // Ajanda açıksa, otomatik olarak yenile
+            if (activeTab === 'calendar') {
+                renderModernCalendar();
+            }
+            // Finans sayfası açıksa tabloyu güncelle
+            const finSec = document.getElementById('financeViewSection');
+            if (finSec && !finSec.classList.contains('hidden')) {
+                populateFinanceYears();
+                renderFinanceTable();
+            }
+            checkAppointmentReminders();
+            } catch (err) {
+                console.error('Veri çekme hatası:', err);
+            }
+        }
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.body.className = currentTheme + '-mode';
+            try { localStorage.setItem('klinik_theme', currentTheme); } catch (e) {}
+            updateThemeButtons();
+        }
+
+        function updateThemeButtons() {
+            const icon = currentTheme === 'dark' ? '🌙' : '☀️';
+            const btnMobile = document.getElementById('themeToggleMobile');
+            const btnDesktop = document.getElementById('themeToggleDesktop');
+            if (btnMobile) btnMobile.innerText = icon;
+            if (btnDesktop) btnDesktop.innerText = icon;
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            currentPage = 1;
+            const calBtn = document.getElementById('tabCalendarBtn');
+            const recBtn = document.getElementById('tabRecordsBtn');
+            const appBtn = document.getElementById('tabAppointmentsBtn');
+            const calendarToolbar = document.getElementById('calendarToolbar');
+            
+            // Tüm sekmeleri gizle
+            document.getElementById('calendarViewSection').classList.add('hidden');
+            document.getElementById('recordsViewSection').classList.add('hidden');
+            document.getElementById('appointmentsViewSection').classList.add('hidden');
+            
+            // Sekme düğmelerini sıfırla
+            calBtn.className = "px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-inactive";
+            recBtn.className = "px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-inactive";
+            appBtn.className = "px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-inactive";
+            
+            // Sekunder buton varsayılan olarak gizli
+            document.getElementById('actionSecondaryBtn').classList.add('hidden');
+
+            if(tab === 'calendar') {
+                calBtn.className = "px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-active";
+                document.getElementById('calendarViewSection').classList.remove('hidden');
+                document.getElementById('recordFilterGroup').classList.add('hidden');
+                document.getElementById('dividerLine').classList.add('hidden');
+                document.getElementById('actionPrimaryBtn').innerText = "📋 Hasta Kaydı Oluştur";
+                document.getElementById('actionPrimaryBtn').setAttribute('onclick', "openMainModalAs('records')");
+                document.getElementById('actionSecondaryBtn').classList.remove('hidden');
+                document.getElementById('actionSecondaryBtn').innerText = "🗓️ Randevu Oluştur";
+                document.getElementById('actionSecondaryBtn').setAttribute('onclick', "openMainModalAs('appointments')");
+                renderModernCalendar();
+            } else if(tab === 'records') {
+                recBtn.className = "px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-active";
+                document.getElementById('recordsViewSection').classList.remove('hidden');
+                document.getElementById('recordFilterGroup').classList.remove('hidden');
+                document.getElementById('dividerLine').classList.remove('hidden');
+                document.getElementById('actionPrimaryBtn').innerText = "➕ Yeni Kayıt";
+                document.getElementById('actionPrimaryBtn').setAttribute('onclick', "openMainModal()");
+            } else {
+                appBtn.className = "px-4 py-2.5 text-xs font-bold rounded-t-xl shadow-sm transition tab-active";
+                document.getElementById('appointmentsViewSection').classList.remove('hidden');
+                document.getElementById('recordFilterGroup').classList.add('hidden');
+                document.getElementById('dividerLine').classList.add('hidden');
+                document.getElementById('actionPrimaryBtn').innerText = "🗓️ Yeni Randevu";
+                document.getElementById('actionPrimaryBtn').setAttribute('onclick', "openMainModal()");
+            }
+            document.getElementById('searchBar').value = '';
+            searchQuery = '';
+            renderData();
+        }
+
+        function openMainModal() {
+            if(activeTab === 'records') {
+                openNewRecordModal();
+            } else {
+                openAppointmentModalWithData('', '', '', '');
+            }
+        }
+
+        // Ajanda ekranındaki iki ayrı butondan (Hasta Kaydı / Randevu) çağrılır
+        function openMainModalAs(type) {
+            if(type === 'records') {
+                openNewRecordModal();
+            } else {
+                openAppointmentModalWithData('', '', '', '');
+            }
+        }
+
+        function openNewRecordModal(presetDate = null) {
+            document.getElementById('recordForm').reset();
+            document.getElementById('editingRecordId').value = '';
+            document.getElementById('convertedFromAppId').value = '';
+            document.getElementById('hastaTc').value = '';
+            if (fpDogumTarihi) fpDogumTarihi.clear();
+            document.getElementById('digerGiderler').value = 0;
+
+            const startD = presetDate ? new Date(presetDate) : new Date();
+            const endD = new Date(startD.getTime() + 15*60000);
+
+            if (fpRecordTarih) fpRecordTarih.setDate(startD, true);
+            if (fpRecordBitis) fpRecordBitis.setDate(endD, true);
+
+            document.getElementById('modalTitle').innerText = 'YENİ HASTA KAYDI';
+            openModal('recordModal');
+        }
+
+        function openAppointmentModalWithData(name = '', phone = '', tc = '', bdate = '', presetDate = null) {
+            document.getElementById('appointmentForm').reset();
+            document.getElementById('editingAppId').value = '';
+            
+            document.getElementById('appHastaAdi').value = name;
+            document.getElementById('appIletisim').value = phone;
+            document.getElementById('appHastaTc').value = tc;
+            if (fpAppDogumTarihi) { if (bdate) fpAppDogumTarihi.setDate(bdate, true); else fpAppDogumTarihi.clear(); }
+
+            const startD = presetDate ? new Date(presetDate) : new Date();
+            const endD = new Date(startD.getTime() + 15*60000);
+
+            if (fpAppTarih) fpAppTarih.setDate(startD, true);
+            if (fpAppBitis) fpAppBitis.setDate(endD, true);
+            
+            document.getElementById('appointmentModalTitle').innerText = 'YENİ RANDEVU OLUŞTUR';
+            if (!presetDate) switchTab('appointments');
+            openModal('appointmentModal');
+        }
+
+        function openAppointmentModalFromRecord(recordId) {
+            const r = records.find(rec => rec.id == recordId);
+            if (!r) return;
+            openAppointmentModalWithData(r.hasta_adi, r.telefon || '', r.tc_kimlik || '', r.dogum_tarihi || '');
+        }
+
+        function lockBodyScroll() {
+            if (document.body.classList.contains('modal-open')) return;
+            const scrollY = window.scrollY || window.pageYOffset;
+            document.body.dataset.scrollY = scrollY;
+            document.body.classList.add('modal-open');
+            document.body.style.top = `-${scrollY}px`;
+        }
+        
+        function unlockBodyScroll() {
+            // Sadece tüm modallar kapalıysa kilidi aç
+            const openModals = document.querySelectorAll('#recordModal:not(.hidden), #appointmentModal:not(.hidden), #slotChoiceModal:not(.hidden), #detailModal:not(.hidden), #recordChoiceModal:not(.hidden)');
+            if (openModals.length > 0) return;
+            const scrollY = parseInt(document.body.dataset.scrollY || '0', 10);
+            document.body.classList.remove('modal-open');
+            document.body.style.top = '';
+            window.scrollTo(0, scrollY);
+        }
+        
+        function closeModal(id) { 
+            document.getElementById(id).classList.add('hidden'); 
+            unlockBodyScroll();
+        }
+        
+        function openModal(id) {
+            lockBodyScroll();
+            document.getElementById(id).classList.remove('hidden');
+        }
+        
+        // MODAL DETAY YAPISI VE BAŞLIK FORMATI REVIZYONU
+        function openDetailModal(title, text) {
+            document.getElementById('detailModalTitle').innerText = title;
+            document.getElementById('detailModalText').innerText = text || 'Belirtilmemiş.';
+            openModal('detailModal');
+        }
+
+        function showProcedureModal(id) {
+            const r = records.find(rec => rec.id == id);
+            if (r) {
+                const dateFormatted = new Date(r.created_at).toLocaleString('tr-TR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                // İstediğin Format: Hasta Adı - İşlem Tarihi
+                openDetailModal(`${r.hasta_adi} - ${dateFormatted}`, r.yapilan_islem);
+            }
+        }
+
+        function showDescriptionModal(id) {
+            const r = records.find(rec => rec.id == id);
+            if (r) {
+                const dateFormatted = new Date(r.created_at).toLocaleString('tr-TR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                openDetailModal(`${r.hasta_adi} - ${dateFormatted}`, r.aciklama || 'Açıklama/Klinik Not bulunmuyor.');
+            }
+        }
+
+        function showAppProcedureModal(id) {
+            const a = appointments.find(app => app.id == id);
+            if (a) {
+                const dateFormatted = new Date(a.tarih).toLocaleString('tr-TR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                openDetailModal(`${a.hasta_adi} - ${dateFormatted}`, a.yapilan_islem || 'Planlanan işlem belirtilmemiş.');
+            }
+        }
+
+        function searchData() {
+            searchQuery = document.getElementById('searchBar').value.toLowerCase().trim();
+            currentPage = 1;
+            renderData();
+        }
+
+        function convertAppointmentToRecord(appId) {
+            const app = appointments.find(a => a.id == appId);
+            if (!app) return;
+
+            document.getElementById('recordForm').reset();
+            document.getElementById('editingRecordId').value = '';
+            document.getElementById('convertedFromAppId').value = app.id;
+            
+            document.getElementById('hastaAdi').value = app.hasta_adi;
+            document.getElementById('hastaTc').value = app.tc_kimlik || '';
+            if (fpDogumTarihi) { if (app.dogum_tarihi) fpDogumTarihi.setDate(app.dogum_tarihi, true); else fpDogumTarihi.clear(); }
+            document.getElementById('hastaTelefon').value = app.iletisim || '';
+            document.getElementById('yapilanIslem').value = app.yapilan_islem || '';
+            document.getElementById('digerGiderler').value = 0;
+            document.getElementById('aciklama').value = 'Randevudan aktarıldı.';
+            
+            const rDate = app.tarih ? new Date(app.tarih) : new Date();
+            if (fpRecordTarih) fpRecordTarih.setDate(rDate, true);
+            
+            // Bitiş tarihini de kopyala (yoksa +15dk)
+            const eDate = app.bitis_tarihi ? new Date(app.bitis_tarihi) : new Date(rDate.getTime() + 15*60000);
+            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+
+            document.getElementById('modalTitle').innerText = 'RANDEVUYU KAYDA DÖNÜŞTÜR';
+            switchTab('records');
+            openModal('recordModal');
+        }
+
+        function sendWhatsAppReminder(appId) {
+            const a = appointments.find(app => app.id == appId);
+            if (!a || !a.iletisim) return alert("Telefon numarası bulunamadı.");
+            
+            let dateStr = "Belirtilen Tarih";
+            let timeStr = "Belirtilen Saat";
+            
+            if(a.tarih) {
+                const parsedDate = new Date(a.tarih);
+                dateStr = parsedDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                timeStr = parsedDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            const message = `Sayın ${a.hasta_adi},\n\nSağlıklı bir gülüş için planlanan diş hekimi randevunuz *${dateStr}* günü, saat *${timeStr}* olarak belirlenmiştir.\n\nSize daha kaliteli ve zamanında bir hizmet sunabilmemiz adına, randevu saatinizden *10 dakika önce* kliniğimizde olmanızı rica ederiz. Randevunuza katılım durumunuzu bu mesaja cevap vererek onaylayabilir veya değiştirebilirsiniz.\n\n*Detaylı bilgi ve iletişim için:* 0555 339 34 24\n\nSağlıklı günler dileriz.`;
+            
+            let phone = a.iletisim.replace(/\D/g, '');
+            if(phone.startsWith('0')) phone = '90' + phone.substring(1);
+            if(!phone.startsWith('90')) phone = '90' + phone;
+
+            window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, '_blank');
+        }
+
+        async function saveRecord(e) {
+            e.preventDefault();
+            const editingId = document.getElementById('editingRecordId').value;
+            const convertedAppId = document.getElementById('convertedFromAppId').value;
+            
+            const odenen = Math.abs(parseFloat(document.getElementById('odenenMiktar').value)) || 0;
+            const gider = Math.abs(parseFloat(document.getElementById('digerGiderler').value)) || 0;
+            const netMatrah = odenen - gider;
+            const pay = netMatrah > 0 ? (netMatrah * 0.50) : 0;
+            
+            const inputVal = document.getElementById('recordTarih').value;
+            const secilenTarih = toSafeISO(inputVal);
+            
+            // Bitiş tarihi - seçilmezse +15 dakika otomatik ekle
+            let bitis_tarihi = null;
+            const bitisVal = document.getElementById('recordBitis').value;
+            if(bitisVal) {
+                bitis_tarihi = toSafeISO(bitisVal);
+            } else {
+                bitis_tarihi = new Date(parseSafeDate(inputVal).getTime() + 15*60000).toISOString();
+            }
+
+            const payload = {
+                hasta_adi: document.getElementById('hastaAdi').value.trim(),
+                tc_kimlik: document.getElementById('hastaTc').value.trim(),
+                dogum_tarihi: document.getElementById('dogumTarihi').value || null,
+                telefon: document.getElementById('hastaTelefon').value.trim(),
+                yapilan_islem: document.getElementById('yapilanIslem').value.trim(),
+                odeme_tipi: document.getElementById('odemeTipi').value,
+                odenen_miktar: odenen,
+                diger_giderler: gider,
+                doktor_a_payi: pay, 
+                doktor_b_payi: pay,
+                aciklama: document.getElementById('aciklama').value.trim(),
+                created_at: secilenTarih,
+                bitis_tarihi: bitis_tarihi
+            };
+
+            if (editingId) {
+                await dbClient.from('records').update(payload).eq('id', editingId);
+            } else {
+                await dbClient.from('records').insert([payload]);
+                if(convertedAppId) {
+                    await dbClient.from('appointments').delete().eq('id', convertedAppId);
+                }
+            }
+            closeModal('recordModal');
+            fetchDataFromCloud();
+        }
+
+        async function saveAppointment(e) {
+            e.preventDefault();
+            const editingId = document.getElementById('editingAppId').value;
+
+            const localInputVal = document.getElementById('appTarih').value; 
+            const targetIsoDate = toSafeISO(localInputVal);
+            
+            // Bitiş tarihi - seçilmezse +15 dakika otomatik ekle
+            let bitis_tarihi = null;
+            const bitisVal = document.getElementById('appBitis').value;
+            if(bitisVal) {
+                bitis_tarihi = toSafeISO(bitisVal);
+            } else {
+                bitis_tarihi = new Date(parseSafeDate(localInputVal).getTime() + 15*60000).toISOString();
+            }
+
+            const payload = {
+                hasta_adi: document.getElementById('appHastaAdi').value.trim(),
+                tc_kimlik: document.getElementById('appHastaTc').value.trim(),
+                dogum_tarihi: document.getElementById('appDogumTarihi').value || null,
+                iletisim: document.getElementById('appIletisim').value.trim(),
+                tarih: targetIsoDate,
+                bitis_tarihi: bitis_tarihi, 
+                yapilan_islem: document.getElementById('appIslem').value.trim()
+            };
+
+            if(editingId) {
+                await dbClient.from('appointments').update(payload).eq('id', editingId);
+            } else {
+                await dbClient.from('appointments').insert([payload]);
+            }
+            closeModal('appointmentModal');
+            fetchDataFromCloud();
+        }
+
+        function openEditRecord(id) {
+            const r = records.find(rec => rec.id == id);
+            if (!r) return;
+            document.getElementById('editingRecordId').value = r.id;
+            document.getElementById('convertedFromAppId').value = '';
+            document.getElementById('hastaAdi').value = r.hasta_adi;
+            document.getElementById('hastaTc').value = r.tc_kimlik || '';
+            if (fpDogumTarihi) { if (r.dogum_tarihi) fpDogumTarihi.setDate(r.dogum_tarihi, true); else fpDogumTarihi.clear(); }
+            document.getElementById('hastaTelefon').value = r.telefon || '';
+            document.getElementById('yapilanIslem').value = r.yapilan_islem;
+            document.getElementById('odemeTipi').value = r.odeme_tipi;
+            document.getElementById('odenenMiktar').value = r.odenen_miktar;
+            document.getElementById('digerGiderler').value = r.diger_giderler;
+            document.getElementById('aciklama').value = r.aciklama || '';
+            
+            const rDate = new Date(r.created_at);
+            if (fpRecordTarih) fpRecordTarih.setDate(rDate, true);
+            
+            // Bitiş tarihi (yoksa +15dk)
+            const eDate = r.bitis_tarihi ? new Date(r.bitis_tarihi) : new Date(rDate.getTime() + 15*60000);
+            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+
+            document.getElementById('modalTitle').innerText = 'KAYDI DÜZENLE';
+            openModal('recordModal');
+        }
+
+        function openEditAppointment(id) {
+            const a = appointments.find(app => app.id == id);
+            if (!a) return;
+            document.getElementById('editingAppId').value = a.id;
+            document.getElementById('appHastaAdi').value = a.hasta_adi;
+            document.getElementById('appHastaTc').value = a.tc_kimlik || '';
+            if (fpAppDogumTarihi) { if (a.dogum_tarihi) fpAppDogumTarihi.setDate(a.dogum_tarihi, true); else fpAppDogumTarihi.clear(); }
+            document.getElementById('appIletisim').value = a.iletisim;
+            
+            const tDate = new Date(a.tarih);
+            if (fpAppTarih) fpAppTarih.setDate(tDate, true);
+            
+            // Bitiş tarihi (yoksa +15dk)
+            const eDate = a.bitis_tarihi ? new Date(a.bitis_tarihi) : new Date(tDate.getTime() + 15*60000);
+            if (fpAppBitis) fpAppBitis.setDate(eDate, true);
+            
+            document.getElementById('appIslem').value = a.yapilan_islem || '';
+            document.getElementById('appointmentModalTitle').innerText = 'RANDEVU DÜZENLE';
+            openModal('appointmentModal');
+        }
+
+        function convertAppointmentToRecord() {
+            const a = appointments.find(app => app.id == document.getElementById('editingAppId').value);
+            if (!a) {
+                alert('Randevu bulunamadı!');
+                return;
+            }
+
+            // Randevu verilerini record formuna aktar
+            document.getElementById('editingRecordId').value = '';
+            document.getElementById('convertedFromAppId').value = a.id;
+            document.getElementById('hastaAdi').value = a.hasta_adi;
+            document.getElementById('hastaTc').value = a.tc_kimlik || '';
+            document.getElementById('hastaTelefon').value = a.iletisim || '';
+            document.getElementById('yapilanIslem').value = a.yapilan_islem || '';
+            
+            // Tarihler
+            const tDate = new Date(a.tarih);
+            if (fpRecordTarih) fpRecordTarih.setDate(tDate, true);
+            
+            const eDate = a.bitis_tarihi ? new Date(a.bitis_tarihi) : new Date(tDate.getTime() + 15*60000);
+            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+
+            // Doğum tarihi
+            if (fpDogumTarihi) { 
+                if (a.dogum_tarihi) fpDogumTarihi.setDate(a.dogum_tarihi, true); 
+                else fpDogumTarihi.clear(); 
+            }
+
+            // Diğer alanları temizle
+            document.getElementById('odemeTipi').value = 'Nakit';
+            document.getElementById('odenenMiktar').value = '';
+            document.getElementById('digerGiderler').value = '0';
+            document.getElementById('aciklama').value = '';
+
+            // Modalları değiştir
+            closeModal('appointmentModal');
+            document.getElementById('modalTitle').innerText = 'MUAYENEYE AL';
+            openModal('recordModal');
+        }
+
+        function openMuayeneModal(isoDateTime) {
+            // Boş record formu aç ama tarih doldurulmuş
+            closeModal('slotChoiceModal');
+            document.getElementById('editingRecordId').value = '';
+            document.getElementById('convertedFromAppId').value = '';
+            document.getElementById('hastaAdi').value = '';
+            document.getElementById('hastaTc').value = '';
+            document.getElementById('hastaTelefon').value = '';
+            document.getElementById('yapilanIslem').value = '';
+            document.getElementById('odemeTipi').value = 'Nakit';
+            document.getElementById('odenenMiktar').value = '';
+            document.getElementById('digerGiderler').value = '0';
+            document.getElementById('aciklama').value = '';
+
+            if (fpDogumTarihi) fpDogumTarihi.clear();
+
+            const d = new Date(isoDateTime);
+            if (fpRecordTarih) fpRecordTarih.setDate(d, true);
+            const eDate = new Date(d.getTime() + 15*60000);
+            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+
+            document.getElementById('modalTitle').innerText = 'MUAYENEYE AL';
+            openModal('recordModal');
+        }
+
+        function openRecordWithAppointmentOption(recordId) {
+            const r = records.find(rec => rec.id == recordId);
+            if (!r) return;
+            
+            pendingRecordId = recordId;
+            
+            // Detayları formatla ve göster - kompakt versiyonu
+            const dateFormatted = new Date(r.created_at).toLocaleDateString('tr-TR', {day:'2-digit', month:'2-digit', year:'numeric'});
+            const timeFormatted = new Date(r.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+            const endTimeFormatted = r.bitis_tarihi ? new Date(r.bitis_tarihi).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'}) : '-';
+            const dogumTarihi = r.dogum_tarihi ? new Date(r.dogum_tarihi).toLocaleDateString('tr-TR') : '-';
+            
+            const detailText = `${r.hasta_adi}
+TC: ${r.tc_kimlik || '-'} | Doğum: ${dogumTarihi}
+Tel: ${r.telefon || '-'}
+
+Tarih: ${dateFormatted} ${timeFormatted} - ${endTimeFormatted}
+
+İşlem: ${r.yapilan_islem}
+Ödeme: ${r.odeme_tipi} | ${r.odenen_miktar} TL
+Gider: ${r.diger_giderler} TL
+
+Not: ${r.aciklama || '-'}`;
+            
+            document.getElementById('recordDetailContent').innerText = detailText;
+            openModal('recordChoiceModal');
+        }
+
+        function createAppointmentFromRecord(recordId) {
+            const r = records.find(rec => rec.id == recordId);
+            if (!r) {
+                alert('Kayıt bulunamadı!');
+                return;
+            }
+
+            // Kaydın verilerini alıp appointment formuna doldur
+            closeModal('recordChoiceModal');
+            document.getElementById('editingAppId').value = '';
+            document.getElementById('appHastaAdi').value = r.hasta_adi;
+            document.getElementById('appHastaTc').value = r.tc_kimlik || '';
+            document.getElementById('appIletisim').value = r.telefon || '';
+            document.getElementById('appIslem').value = r.yapilan_islem || '';
+            
+            if (fpAppDogumTarihi) { 
+                if (r.dogum_tarihi) fpAppDogumTarihi.setDate(r.dogum_tarihi, true); 
+                else fpAppDogumTarihi.clear(); 
+            }
+            
+            // Tarih, kaydın yapıldığı zaman olarak başlat
+            const rDate = new Date(r.created_at);
+            if (fpAppTarih) fpAppTarih.setDate(rDate, true);
+            
+            const eDate = r.bitis_tarihi ? new Date(r.bitis_tarihi) : new Date(rDate.getTime() + 15*60000);
+            if (fpAppBitis) fpAppBitis.setDate(eDate, true);
+            
+            document.getElementById('appointmentModalTitle').innerText = 'RANDEVU OLUŞTUR';
+            openModal('appointmentModal');
+        }
+
+        function editRecordFromChoice(recordId) {
+            closeModal('recordChoiceModal');
+            openEditRecord(recordId);
+        }
+
+        async function deleteRecord(id) {
+            if(confirm('Kayıt silinecektir. Emin misiniz?')) {
+                await dbClient.from('records').delete().eq('id', id);
+                fetchDataFromCloud();
+            }
+        }
+
+        async function deleteAppointment(id) {
+            if(confirm('Randevu iptal edilecektir. Emin misiniz?')) {
+                await dbClient.from('appointments').delete().eq('id', id);
+                fetchDataFromCloud();
+            }
+        }
+
+        function setFilter(type) {
+            currentFilter = type;
+            currentPage = 1;
+            
+            const btnAll = document.getElementById('btnFilterAll');
+            const btnDaily = document.getElementById('btnFilterDaily');
+            const btnWeekly = document.getElementById('btnFilterWeekly');
+            
+            const activeClass = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-custom text-white transition shadow-sm";
+            const inactiveClass = "px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-500 hover:bg-zinc-500/20 transition";
+            
+            btnAll.className = (type === 'all') ? activeClass : inactiveClass;
+            btnDaily.className = (type === 'daily') ? activeClass : inactiveClass;
+            btnWeekly.className = (type === 'weekly') ? activeClass : inactiveClass;
+            
+            renderData();
+        }
+
+        // Bir randevuya kalan/geçen süreyi hesaplayıp rozet (etiket + renk sınıfı) döner
+        function formatCountdown(targetIso) {
+            const now = new Date();
+            const target = new Date(targetIso);
+            const diffMins = Math.round((target - now) / 60000);
+            const base = "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold tracking-wide whitespace-nowrap";
+
+            if (diffMins < -15) {
+                return { label: "Geçti", cls: base + " bg-zinc-500/10 text-gray-400" };
+            } else if (diffMins <= 15) {
+                return { label: diffMins <= 0 ? "🔴 Şimdi" : `🔴 ${diffMins} dk kaldı`, cls: base + " bg-red-500/15 text-red-500 reminder-pulse" };
+            } else if (diffMins <= 60) {
+                return { label: `🟠 ${diffMins} dk kaldı`, cls: base + " bg-amber-500/15 text-amber-600 dark:text-amber-400" };
+            } else if (diffMins <= 1440) {
+                return { label: `🕐 ${Math.round(diffMins/60)} sa kaldı`, cls: base + " bg-blue-500/10 text-blue-500" };
+            } else {
+                return { label: `📅 ${Math.round(diffMins/1440)} gün kaldı`, cls: base + " bg-zinc-500/10 text-gray-400" };
+            }
+        }
+
+        // Tabloda/kartlarda çizilmiş geri sayım rozetlerini DOM'u yeniden çizmeden günceller
+        function refreshCountdownBadges() {
+            appointments.forEach(a => {
+                const { label, cls } = formatCountdown(a.tarih);
+                const d = document.getElementById('countdown-desktop-' + a.id);
+                if (d) { d.innerText = label; d.className = cls; }
+                const m = document.getElementById('countdown-mobile-' + a.id);
+                if (m) { m.innerText = label; m.className = cls; }
+            });
+        }
+
+        function checkAppointmentReminders() {
+            const reminderPanel = document.getElementById('appointmentReminderPanel');
+            const reminderText = document.getElementById('reminderText');
+            const badge = document.getElementById('badgeAppointmentCount');
+            
+            const now = new Date();
+            const todayStr = now.toDateString();
+
+            const todaysApps = appointments.filter(a => new Date(a.tarih).toDateString() === todayStr);
+            if(todaysApps.length > 0) {
+                badge.innerText = todaysApps.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            let upcoming = [];
+            appointments.forEach(a => {
+                const appTime = new Date(a.tarih);
+                const diffMs = appTime - now; 
+                const diffMins = Math.floor(diffMs / 1000 / 60);
+
+                if (diffMins >= 0 && diffMins <= 60) {
+                    upcoming.push(`${a.hasta_adi} (${diffMins} dk sonra)`);
+                }
+            });
+
+            if(upcoming.length > 0) {
+                reminderText.innerText = "Yaklaşan Randevular: " + upcoming.join(', ');
+                reminderPanel.classList.remove('hidden');
+            } else {
+                reminderPanel.classList.add('hidden');
+            }
+
+            refreshCountdownBadges();
+        }
+
+        function calculateGlobalStats() {
+            const now = new Date();
+            const currentDayString = now.toDateString();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            let dailyCiro = 0, dailyDocA = 0, dailyDocB = 0;
+            let monthlyCiro = 0;
+
+            records.forEach(r => {
+                const rDate = new Date(r.created_at);
+                if (rDate.toDateString() === currentDayString) {
+                    dailyCiro += parseFloat(r.odenen_miktar || 0);
+                    dailyDocA += parseFloat(r.doktor_a_payi || 0);
+                    dailyDocB += parseFloat(r.doktor_b_payi || 0);
+                }
+                if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
+                    monthlyCiro += parseFloat(r.odenen_miktar || 0);
+                }
+            });
+
+            document.getElementById('statTotalCiro').innerText = dailyCiro.toFixed(2) + ' TL';
+            document.getElementById('statDocA').innerText = dailyDocA.toFixed(2) + ' TL';
+            document.getElementById('statDocB').innerText = dailyDocB.toFixed(2) + ' TL';
+            document.getElementById('statAylikCiro').innerText = monthlyCiro.toFixed(2) + ' TL';
+        }
+
+        // --- FİNANS RAPORU ---
+        const AY_ISIMLERI = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+        function showFinancePage() {
+            document.getElementById('mainAppContent').classList.add('hidden');
+            document.getElementById('financeViewSection').classList.remove('hidden');
+            populateFinanceYears();
+            renderFinanceTable();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function hideFinancePage() {
+            document.getElementById('financeViewSection').classList.add('hidden');
+            document.getElementById('mainAppContent').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function populateFinanceYears() {
+            const sel = document.getElementById('financeYearSelect');
+            if (!sel) return;
+            const years = new Set();
+            const thisYear = new Date().getFullYear();
+            years.add(thisYear);
+            records.forEach(r => {
+                const y = new Date(r.created_at).getFullYear();
+                if (!isNaN(y)) years.add(y);
+            });
+            const sorted = Array.from(years).sort((a, b) => b - a);
+            const currentVal = sel.value;
+            sel.innerHTML = sorted.map(y => `<option value="${y}">${y}</option>`).join('');
+            if (currentVal && sorted.includes(parseInt(currentVal, 10))) {
+                sel.value = currentVal;
+            } else {
+                sel.value = thisYear;
+            }
+        }
+
+        function renderFinanceTable() {
+            const yearSel = document.getElementById('financeYearSelect');
+            const year = parseInt(yearSel && yearSel.value ? yearSel.value : new Date().getFullYear(), 10);
+            const months = Array.from({ length: 12 }, () => ({
+                gelir: 0, gider: 0, kar: 0, docA: 0, docB: 0, count: 0
+            }));
+
+            records.forEach(r => {
+                const d = new Date(r.created_at);
+                if (d.getFullYear() !== year) return;
+                const m = d.getMonth();
+                const gelir = parseFloat(r.odenen_miktar || 0);
+                const gider = parseFloat(r.diger_giderler || 0);
+                months[m].gelir += gelir;
+                months[m].gider += gider;
+                months[m].kar += (gelir - gider);
+                months[m].docA += parseFloat(r.doktor_a_payi || 0);
+                months[m].docB += parseFloat(r.doktor_b_payi || 0);
+                months[m].count += 1;
+            });
+
+            const tbody = document.getElementById('financeTableBody');
+            const emptyMsg = document.getElementById('financeEmptyMsg');
+            tbody.innerHTML = '';
+
+            let tGelir = 0, tGider = 0, tKar = 0, tDocA = 0, tDocB = 0, tCount = 0;
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            months.forEach((row, i) => {
+                tGelir += row.gelir;
+                tGider += row.gider;
+                tKar += row.kar;
+                tDocA += row.docA;
+                tDocB += row.docB;
+                tCount += row.count;
+
+                const isCurrent = (year === currentYear && i === currentMonth);
+                const rowCls = isCurrent
+                    ? 'bg-red-500/5 hover:bg-red-500/10 transition'
+                    : 'hover:bg-zinc-500/5 transition';
+                const karCls = row.kar >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-red-500 font-semibold';
+
+                tbody.innerHTML += `
+                    <tr class="${rowCls} border-b border-zinc-500/10">
+                        <td class="p-3 font-semibold text-title whitespace-nowrap">
+                            ${AY_ISIMLERI[i]}${isCurrent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-500 font-bold">Bu Ay</span>' : ''}
+                        </td>
+                        <td class="p-3 text-right font-medium">${row.gelir.toFixed(2)}</td>
+                        <td class="p-3 text-right">${row.gider.toFixed(2)}</td>
+                        <td class="p-3 text-right ${karCls}">${row.kar.toFixed(2)}</td>
+                        <td class="p-3 text-right text-red-500">${row.docA.toFixed(2)}</td>
+                        <td class="p-3 text-right">${row.docB.toFixed(2)}</td>
+                        <td class="p-3 text-center text-gray-400">${row.count}</td>
+                    </tr>`;
+            });
+
+            document.getElementById('finTotalGelir').innerText = tGelir.toFixed(2) + ' TL';
+            document.getElementById('finTotalGider').innerText = tGider.toFixed(2) + ' TL';
+            document.getElementById('finTotalKar').innerText = tKar.toFixed(2) + ' TL';
+            document.getElementById('finFootGelir').innerText = tGelir.toFixed(2);
+            document.getElementById('finFootGider').innerText = tGider.toFixed(2);
+            document.getElementById('finFootKar').innerText = tKar.toFixed(2);
+            document.getElementById('finFootDocA').innerText = tDocA.toFixed(2);
+            document.getElementById('finFootDocB').innerText = tDocB.toFixed(2);
+            document.getElementById('finFootCount').innerText = tCount;
+
+            if (tCount === 0) {
+                emptyMsg.classList.remove('hidden');
+            } else {
+                emptyMsg.classList.add('hidden');
+            }
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderData();
+        }
+
+        // MOTOR RENDER ALTYAPISI - TAM ENTEGRE GÖRÜNÜM
+        function renderData() {
+            calculateGlobalStats();
+            const noData = document.getElementById('noDataMessage');
+            const paginationCtrl = document.getElementById('paginationContainer');
+            let totalItemsCount = 0;
+            let displayRecords = [];
+
+            const desktopBody = document.getElementById('desktopTableBody');
+            const mobileContainer = document.getElementById('mobileCardsContainer');
+            const appBody = document.getElementById('appointmentsTableBody');
+            const mobileAppContainer = document.getElementById('mobileAppointmentsContainer');
+
+            desktopBody.innerHTML = '';
+            mobileContainer.innerHTML = '';
+            appBody.innerHTML = '';
+            mobileAppContainer.innerHTML = '';
+
+            if (activeTab === 'records') {
+                const now = new Date();
+                let filtered = records.filter(r => {
+                    const rDate = new Date(r.created_at);
+                    if (currentFilter === 'daily') return rDate.toDateString() === now.toDateString();
+                    if (currentFilter === 'weekly') return rDate >= new Date(now.getTime() - 7*24*60*60*1000);
+                    return true;
+                });
+
+                if(searchQuery) {
+                    filtered = filtered.filter(r => r.hasta_adi.toLowerCase().includes(searchQuery));
+                }
+
+                totalItemsCount = filtered.length;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                displayRecords = filtered.slice(startIndex, startIndex + itemsPerPage);
+
+                displayRecords.forEach(r => {
+                    const dateFormatted = new Date(r.created_at).toLocaleString('tr-TR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+                    const endDateFormatted = r.bitis_tarihi ? new Date(r.bitis_tarihi).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'}) : '-';
+                    
+                    const desktopTelRow = r.telefon ? `
+                        <div class="mt-1 flex items-center gap-1 bg-zinc-500/10 rounded px-1.5 py-0.5 max-w-max border border-zinc-700/20 dark:border-zinc-700/40">
+                            <a href="tel:${r.telefon}" class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-wider hover:underline transition" title="Aramak için tıklayın">📞 ${r.telefon}</a>
+                        </div>
+                    ` : '';
+
+                    const desktopTcRow = r.tc_kimlik ? `
+                        <span class="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 font-mono tracking-wider block mt-0.5">🆔 TC: ${r.tc_kimlik}</span>
+                    ` : '';
+
+                    const desktopDtRow = r.dogum_tarihi ? `
+                        <span class="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 font-mono tracking-wider block mt-0.5">🎂 DT: ${new Date(r.dogum_tarihi).toLocaleDateString('tr-TR')}</span>
+                    ` : '';
+
+                    // İSTENEN DEĞİŞİKLİK: Mavi link rengi kaldırıldı, hover durumunda gri ve kalın olarak kalır.
+                    desktopBody.innerHTML += `
+                        <tr class="hover:bg-zinc-500/5 transition border-b border-zinc-500/10">
+                            <td class="p-3 text-xs whitespace-nowrap">${dateFormatted}</td>
+                            <td class="p-3 text-xs font-semibold text-gray-500">${endDateFormatted}</td>
+                            <td class="p-3 font-semibold text-title align-middle">
+                                <span class="text-sm block font-bold tracking-wide truncate max-w-[160px]">${r.hasta_adi}</span>
+                                ${desktopTcRow}
+                                ${desktopDtRow}
+                                ${desktopTelRow}
+                            </td>
+                            <td class="p-3 truncate max-w-[120px]">
+                                <button onclick="showProcedureModal('${r.id}')" class="islem-link-btn text-left block truncate max-w-[120px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white" title="İşlem detayını gör">${r.yapilan_islem}</button>
+                            </td>
+                            <td class="p-3 text-xs"><span>${r.odeme_tipi}</span></td>
+                            <td class="p-3 text-right text-title font-medium">${parseFloat(r.odenen_miktar || 0).toFixed(2)}</td>
+                            <td class="p-3 text-right">${parseFloat(r.diger_giderler || 0).toFixed(2)}</td>
+                            <td class="p-3 text-right font-semibold text-red-500">${parseFloat(r.doktor_a_payi || 0).toFixed(2)}</td>
+                            <td class="p-3 text-right font-semibold">${parseFloat(r.doktor_b_payi || 0).toFixed(2)}</td>
+                            <td class="p-3 text-xs">
+                                <button onclick="showDescriptionModal('${r.id}')" class="islem-link-btn text-left block truncate max-w-[100px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white" title="Açıklamayı gör">${r.aciklama || '👁️ Oku'}</button>
+                            </td>
+                            <td class="p-3 text-center whitespace-nowrap space-x-2 font-medium">
+                                <button onclick="openAppointmentModalFromRecord('${r.id}')" class="text-amber-500 hover:underline transition" title="Direkt randevu yaz">🗓️ Randevu</button>
+                                <button onclick="openEditRecord('${r.id}')" class="text-blue-500 hover:underline transition">Düzenle</button>
+                                <button onclick="deleteRecord('${r.id}')" class="text-gray-400 hover:text-red-500 transition">Sil</button>
+                            </td>
+                        </tr>`;
+
+                    mobileContainer.innerHTML += `
+                        <div class="bg-card-custom border border-custom p-4 rounded-xl space-y-3 shadow-sm text-xs card-hover">
+                            <div class="flex justify-between items-center border-b border-zinc-500/10 pb-2">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-gray-400 font-medium">➕ ${dateFormatted}</span>
+                                    <span class="text-gray-500 font-medium">➖ ${endDateFormatted}</span>
+                                </div>
+                                <span class="px-2 py-0.5 rounded bg-zinc-500/10 text-title font-semibold">${r.odeme_tipi}</span>
+                            </div>
+                            <div>
+                                <h4 class="text-title font-bold text-base tracking-wide uppercase">${r.hasta_adi}</h4>
+                                ${r.tc_kimlik ? `<p class="text-[10px] text-zinc-400 font-mono mt-0.5">🆔 TC: ${r.tc_kimlik}</p>` : ''}
+                                ${r.dogum_tarihi ? `<p class="text-[10px] text-zinc-400 font-mono mt-0.5">🎂 Doğum Tarihi: ${new Date(r.dogum_tarihi).toLocaleDateString('tr-TR')}</p>` : ''}
+                                <p class="mt-1"><span class="text-gray-400 font-semibold">İşlem:</span> <button onclick="showProcedureModal('${r.id}')" class="islem-link-btn underline text-left truncate max-w-[200px] inline-block align-bottom text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white">${r.yapilan_islem}</button></p>
+                            </div>
+                            
+                            ${r.telefon ? `
+                            <div class="bg-zinc-50/50 dark:bg-zinc-950/40 border border-custom rounded p-2.5 flex justify-between items-center my-2">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">İletişim Hattı</span>
+                                    <a href="tel:${r.telefon}" class="text-sm font-bold text-emerald-600 dark:text-emerald-400 tracking-wide underline transition" title="Aramak için tıklayın">${r.telefon}</a>
+                                </div>
+                                <span class="text-[10px] text-gray-400 font-medium italic">📞 Tıkla Ara</span>
+                            </div>` : ''}
+
+                            <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] bg-zinc-950/40 p-2 rounded">
+                                <div><span class="text-gray-400">Ödenen:</span> <span class="font-bold text-title">${parseFloat(r.odenen_miktar || 0).toFixed(2)} TL</span></div>
+                                <div><span class="text-gray-400">Gider:</span> <span class="font-bold">${parseFloat(r.diger_giderler || 0).toFixed(2)} TL</span></div>
+                                <div><span class="text-red-400">Sümeyye Payı:</span> <span class="font-bold text-red-500">${parseFloat(r.doktor_a_payi || 0).toFixed(2)} TL</span></div>
+                                <div><span class="text-gray-400">Murat Payı:</span> <span class="font-bold text-title">${parseFloat(r.doktor_b_payi || 0).toFixed(2)} TL</span></div>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-zinc-500/10">
+                                <button onclick="showDescriptionModal('${r.id}')" class="islem-link-btn text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white underline">📄 Notu Oku</button>
+                                <div class="space-x-3 font-semibold text-[12px] flex items-center">
+                                    <button onclick="openAppointmentModalFromRecord('${r.id}')" class="text-amber-500">🗓️ Randevu Yaz</button>
+                                    <button onclick="openEditRecord('${r.id}')" class="text-blue-500">Düzenle</button>
+                                    <button onclick="deleteRecord('${r.id}')" class="text-red-500">Sil</button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                let filteredApp = appointments;
+                if(searchQuery) {
+                    filteredApp = filteredApp.filter(a => a.hasta_adi.toLowerCase().includes(searchQuery));
+                }
+
+                totalItemsCount = filteredApp.length;
+                displayRecords = filteredApp.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+                displayRecords.forEach(a => {
+                    const dateFormatted = new Date(a.tarih).toLocaleString('tr-TR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                    const appEndDateFormatted = a.bitis_tarihi ? new Date(a.bitis_tarihi).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'}) : '-';
+                    
+                    const desktopAppTel = a.iletisim ? `
+                        <div class="flex items-center gap-1.5 bg-zinc-500/10 rounded px-2 py-0.5 max-w-max border border-zinc-700/20">
+                            <a href="tel:${a.iletisim}" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono hover:underline transition">${a.iletisim}</a>
+                        </div>
+                    ` : '-';
+
+                    const appTcRow = a.tc_kimlik ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">🆔 TC: ${a.tc_kimlik}</span>` : '';
+                    const appDtRow = a.dogum_tarihi ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">🎂 DT: ${new Date(a.dogum_tarihi).toLocaleDateString('tr-TR')}</span>` : '';
+                    const cd = formatCountdown(a.tarih);
+
+                    appBody.innerHTML += `
+                        <tr class="hover:bg-zinc-500/5 transition border-b border-zinc-500/10">
+                            <td class="p-3 text-xs font-semibold text-red-500">${dateFormatted}</td>
+                            <td class="p-3"><span id="countdown-desktop-${a.id}" class="${cd.cls}">${cd.label}</span></td>
+                            <td class="p-3 text-xs font-semibold text-gray-500">${appEndDateFormatted}</td>
+                            <td class="p-3 font-semibold text-title text-sm align-middle">
+                                <span class="block font-bold truncate max-w-[140px]">${a.hasta_adi}</span>
+                                ${appTcRow}
+                                ${appDtRow}
+                            </td>
+                            <td class="p-3">${desktopAppTel}</td>
+                            <td class="p-3 truncate max-w-[140px]">
+                                <button onclick="showAppProcedureModal('${a.id}')" class="islem-link-btn text-left block truncate max-w-[140px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white" title="Planlanan işlem detayını gör">${a.yapilan_islem || '-'}</button>
+                            </td>
+                            <td class="p-3 text-center space-x-3 whitespace-nowrap font-medium">
+                                <button onclick="convertAppointmentToRecord('${a.id}')" class="text-emerald-600 dark:text-emerald-500 font-bold hover:underline transition">✅ Muayene Başlat</button>
+                                <button onclick="sendWhatsAppReminder('${a.id}')" class="text-teal-600 dark:text-teal-400 hover:underline transition">💬 Hatırlat</button>
+                                <button onclick="openEditAppointment('${a.id}')" class="text-blue-500 hover:underline transition">Düzenle</button>
+                                <button onclick="deleteAppointment('${a.id}')" class="text-gray-400 hover:text-red-500 transition">İptal</button>
+                            </td>
+                        </tr>`;
+
+                    mobileAppContainer.innerHTML += `
+                        <div class="bg-card-custom border border-custom p-4 rounded-xl space-y-3 shadow-sm text-xs card-hover">
+                            <div class="flex justify-between items-center border-b border-zinc-500/10 pb-1.5">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-red-500 font-bold tracking-wide">➕ ${dateFormatted}</span>
+                                    <span class="text-gray-500 font-bold tracking-wide">➖ ${appEndDateFormatted}</span>
+                                </div>
+                                <span id="countdown-mobile-${a.id}" class="${cd.cls}">${cd.label}</span>
+                            </div>
+                            <div>
+                                <h4 class="text-title font-bold text-base uppercase tracking-wide">${a.hasta_adi}</h4>
+                                ${a.tc_kimlik ? `<p class="text-[10px] text-zinc-400 font-mono mt-0.5">🆔 TC: ${a.tc_kimlik}</p>` : ''}
+                                ${a.dogum_tarihi ? `<p class="text-[10px] text-zinc-400 font-mono mt-0.5">🎂 Doğum Tarihi: ${new Date(a.dogum_tarihi).toLocaleDateString('tr-TR')}</p>` : ''}
+                                <p class="mt-1"><span class="text-gray-400 font-semibold">Planlanan:</span> <button onclick="showAppProcedureModal('${a.id}')" class="islem-link-btn underline text-left truncate max-w-[200px] inline-block align-bottom text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white">${a.yapilan_islem || '-'}</button></p>
+                            </div>
+
+                            <div class="bg-zinc-50/50 dark:bg-zinc-950/40 border border-custom rounded p-2.5 flex justify-between items-center my-2">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Randevu İletişim</span>
+                                    <a href="tel:${a.iletisim}" class="text-sm font-bold text-emerald-600 dark:text-emerald-400 tracking-wide underline transition">${a.iletisim}</a>
+                                </div>
+                                <button onclick="sendWhatsAppReminder('${a.id}')" class="px-3 py-1 bg-teal-600 text-white text-[11px] font-bold rounded shadow-sm hover:bg-teal-700 transition flex items-center gap-1">💬 Hatırlat</button>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2 pt-2 justify-between items-center border-t border-zinc-500/10 text-[12px]">
+                                <button onclick="convertAppointmentToRecord('${a.id}')" class="px-3 py-1.5 rounded bg-emerald-600 text-white font-bold shadow-sm">✅ Muayene Başlat</button>
+                                <div class="space-x-3 font-semibold">
+                                    <button onclick="openEditAppointment('${a.id}')" class="text-blue-500">Düzenle</button>
+                                    <button onclick="deleteAppointment('${a.id}')" class="text-gray-500">İptal</button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+            }
+
+            if (totalItemsCount > 0) {
+                noData.classList.add('hidden');
+                paginationCtrl.classList.remove('hidden');
+                const start = (currentPage - 1) * itemsPerPage + 1;
+                const end = Math.min(currentPage * itemsPerPage, totalItemsCount);
+                document.getElementById('pageTotalItems').innerText = totalItemsCount;
+                document.getElementById('pageRange').innerText = `${start}-${end}`;
+                document.getElementById('btnPrevPage').disabled = (currentPage === 1);
+                document.getElementById('btnNextPage').disabled = (end >= totalItemsCount);
+            } else {
+                noData.classList.remove('hidden');
+                paginationCtrl.classList.add('hidden');
+            }
+        }
+
+        function exportToExcel() {
+            let data = [];
+            if(activeTab === 'records') {
+                data = records.map(r => ({
+                    'Tarih': new Date(r.created_at).toLocaleString('tr-TR'), 
+                    'Hasta Adı': r.hasta_adi, 
+                    'TC Kimlik No': r.tc_kimlik || '-',
+                    'Doğum Tarihi': r.dogum_tarihi ? new Date(r.dogum_tarihi).toLocaleDateString('tr-TR') : '-',
+                    'Telefon Numarası': r.telefon || '-',
+                    'Yapılan İşlem': r.yapilan_islem,
+                    'Ödeme Tipi': r.odeme_tipi, 
+                    'Ödenen (TL)': r.odenen_miktar, 
+                    'Gider (TL)': r.diger_giderler, 
+                    'Sümeyye Payı': r.doktor_a_payi, 
+                    'Murat Payı': r.doktor_b_payi, 
+                    'Açıklama': r.aciklama
+                }));
+            } else {
+                data = appointments.map(a => ({ 
+                    'Randevu Zamanı': new Date(a.tarih).toLocaleString('tr-TR'), 
+                    'Hasta Adı': a.hasta_adi, 
+                    'TC Kimlik No': a.tc_kimlik || '-',
+                    'Doğum Tarihi': a.dogum_tarihi ? new Date(a.dogum_tarihi).toLocaleDateString('tr-TR') : '-',
+                    'İletişim Numarası': a.iletisim || '-',
+                    'Planlanan İşlem': a.yapilan_islem 
+                }));
+            }
+            if(data.length === 0) return alert('Dışa aktarılacak veri bulunamadı.');
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Klinik Raporu");
+            XLSX.writeFile(wb, `Klinik_Sistem_Raporu.xlsx`);
+        }
+
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            doc.text("Klinik Yönetim Otomasyon Raporu", 14, 15);
+            
+            if(activeTab === 'records') {
+                const rows = records.map(r => [
+                    new Date(r.created_at).toLocaleString('tr-TR'), 
+                    r.hasta_adi, 
+                    r.dogum_tarihi ? new Date(r.dogum_tarihi).toLocaleDateString('tr-TR') : '-',
+                    r.tc_kimlik || '-',
+                    r.telefon || '-', 
+                    r.yapilan_islem, 
+                    r.odeme_tipi, 
+                    parseFloat(r.odenen_miktar || 0).toFixed(2)
+                ]);
+                doc.autoTable({ 
+                    head: [['Tarih', 'Hasta Adi', 'D.Tarihi', 'TC Kimlik', 'Telefon', 'Islem', 'Odeme', 'Odenen (TL)']], 
+                    body: rows, 
+                    startY: 22 
+                });
+            } else {
+                const rows = appointments.map(a => [
+                    new Date(a.tarih).toLocaleString('tr-TR'), 
+                    a.hasta_adi, 
+                    a.dogum_tarihi ? new Date(a.dogum_tarihi).toLocaleDateString('tr-TR') : '-',
+                    a.tc_kimlik || '-',
+                    a.iletisim || '-', 
+                    a.yapilan_islem || '-'
+                ]);
+                doc.autoTable({ 
+                    head: [['Randevu Zamani', 'Hasta Adi', 'D.Tarihi', 'TC Kimlik', 'Iletisim', 'Planlanan Islem']], 
+                    body: rows, 
+                    startY: 22 
+                });
+            }
+            doc.save("Klinik_Sistem_Raporu.pdf");
+        }
+
+        // --- AJANDA YÖNETİMİ VE ÇİZİMİ ---
+        let currentWeekStart = getMonday(new Date());
+        const CAL_START_HOUR = 8;
+        const CAL_END_HOUR = 20;
+        const PIXELS_PER_MINUTE = 1.6;
+
+        function getMonday(d) {
+            d = new Date(d);
+            var day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
+            return new Date(d.setHours(0,0,0,0) - (d.getTimezoneOffset() * 60000)).setDate(diff);
+        }
+
+        function changeWeek(offset) {
+            let nextW = new Date(currentWeekStart);
+            nextW.setDate(nextW.getDate() + (offset * 7));
+            currentWeekStart = nextW;
+            renderModernCalendar();
+        }
+
+        function jumpToToday() {
+            currentWeekStart = getMonday(new Date());
+            renderModernCalendar();
+        }
+
+        function renderModernCalendar() {
+            const calContainer = document.getElementById('calendarRenderArea');
+            if(!calContainer) return;
+
+            const weekDates = [];
+            let tempDate = new Date(currentWeekStart);
+            
+            let endOfWeek = new Date(tempDate);
+            endOfWeek.setDate(endOfWeek.getDate() + 6);
+            document.getElementById('calendarWeekLabel').innerText = 
+                `${tempDate.getDate()} ${tempDate.toLocaleDateString('tr-TR',{month:'short'})} - ${endOfWeek.getDate()} ${endOfWeek.toLocaleDateString('tr-TR',{month:'short'})} ${endOfWeek.getFullYear()}`;
+
+            for(let i=0; i<7; i++) {
+                weekDates.push(new Date(tempDate));
+                tempDate.setDate(tempDate.getDate() + 1);
+            }
+
+            // HEADER (Günler)
+            let html = `<div class="flex border-b border-custom">
+                <div class="w-16 shrink-0 bg-zinc-500/5 border-r border-custom"></div>`;
+            weekDates.forEach(d => {
+                const isToday = d.toDateString() === new Date().toDateString();
+                const bgClass = isToday ? 'bg-gradient-to-b from-red-500/15 to-red-500/5 text-red-500' : 'bg-zinc-500/5 text-gray-500';
+                html += `<div class="flex-1 min-w-[100px] text-center py-2.5 border-r border-custom text-xs font-bold ${bgClass}">
+                    ${d.toLocaleDateString('tr-TR', { weekday: 'long' })} <br> 
+                    <span class="text-sm text-title">${d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}</span>
+                    ${isToday ? '<span class="block w-1.5 h-1.5 bg-red-500 rounded-full mx-auto mt-1"></span>' : ''}
+                </div>`;
+            });
+            html += `</div>`;
+
+            // BODY (Zaman Izgarası)
+            const gridHeight = (CAL_END_HOUR - CAL_START_HOUR) * 60 * PIXELS_PER_MINUTE;
+            html += `<div class="flex relative bg-card-custom" style="height: ${gridHeight}px">`;
+
+            // Sol Saat Sütunu
+            html += `<div class="w-16 shrink-0 border-r border-custom relative bg-zinc-500/5">`;
+            for(let h = CAL_START_HOUR; h < CAL_END_HOUR; h++) {
+                for(let m = 0; m < 60; m+=15) {
+                    const top = ((h - CAL_START_HOUR) * 60 + m) * PIXELS_PER_MINUTE;
+                    const isHour = m === 0;
+                    const textClass = isHour ? 'text-[10px] text-gray-400 font-bold' : 'text-[8px] text-gray-500/60';
+                    const offset = isHour ? 7 : 5;
+                    html += `<div class="absolute w-full text-center ${textClass}" style="top: ${top - offset}px">${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}</div>`;
+                }
+            }
+            html += `</div>`;
+
+            // Gün Sütunları ve Tıklanabilir Boş Alanlar
+            weekDates.forEach(d => {
+                const dateIsoStr = d.toISOString().split('T')[0];
+                html += `<div class="flex-1 min-w-[100px] border-r border-custom relative">`;
+                
+                // Arka plan çizgileri ve boş alana tıklama
+                for(let h = CAL_START_HOUR; h < CAL_END_HOUR; h++) {
+                    for(let m = 0; m < 60; m+=15) {
+                        const top = ((h - CAL_START_HOUR) * 60 + m) * PIXELS_PER_MINUTE;
+                        const height = 15 * PIXELS_PER_MINUTE;
+                        
+                        let borderClass = 'border-t cal-grid-line opacity-25 border-dotted';
+                        if (m === 0) borderClass = 'border-t cal-grid-line';
+                        else if (m === 30) borderClass = 'border-t border-dashed cal-grid-line opacity-50';
+                        
+                        html += `<div class="absolute w-full ${borderClass} cursor-pointer hover:bg-red-500/10 transition z-0" 
+                            style="top: ${top}px; height: ${height}px" 
+                            title="${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} - Boş Saat (Tıkla)"
+                            onclick="openSlotChoice('${dateIsoStr}T${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}')">
+                        </div>`;
+                    }
+                }
+
+                // Randevuları Çiz
+                appointments.forEach(app => {
+                    if (new Date(app.tarih).toDateString() === d.toDateString()) {
+                        html += generateEventBlock(app, 'app');
+                    }
+                });
+
+                // Kayıtları Çiz
+                records.forEach(rec => {
+                    if (new Date(rec.created_at).toDateString() === d.toDateString()) {
+                        html += generateEventBlock(rec, 'rec');
+                    }
+                });
+
+                html += `</div>`;
+            });
+            html += `</div>`;
+            calContainer.innerHTML = html;
+        }
+
+        function generateEventBlock(item, type) {
+            const startKey = type === 'app' ? 'tarih' : 'created_at';
+            const startTime = new Date(item[startKey]);
+            
+            let endTime;
+            if (item.bitis_tarihi) {
+                endTime = new Date(item.bitis_tarihi);
+            } else {
+                endTime = new Date(startTime.getTime() + 15*60000); 
+            }
+
+            const startMins = (startTime.getHours() * 60 + startTime.getMinutes()) - (CAL_START_HOUR * 60);
+            const durationMins = (endTime - startTime) / 60000;
+            
+            if(startMins < 0 || startMins > (CAL_END_HOUR - CAL_START_HOUR)*60) return '';
+
+            const top = startMins * PIXELS_PER_MINUTE;
+            const height = Math.max(durationMins * PIXELS_PER_MINUTE, 20);
+
+            const colorClass = type === 'app' 
+                ? 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-500/25 dark:to-amber-500/10 border-l-[3px] border-amber-500 text-amber-800 dark:text-amber-200' 
+                : 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-500/25 dark:to-emerald-500/10 border-l-[3px] border-emerald-500 text-emerald-800 dark:text-emerald-200';
+            
+            const title = item.hasta_adi;
+            const sub = item.yapilan_islem || '-';
+            const onClickStr = type === 'app' ? `openEditAppointment('${item.id}')` : `openRecordWithAppointmentOption('${item.id}')`;
+
+            return `<div onclick="${onClickStr}" class="absolute w-[calc(100%-6px)] left-[3px] rounded-lg p-1.5 overflow-hidden cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-[1px] hover:z-20 transition-all duration-150 z-10 ${colorClass}" style="top: ${top}px; height: ${height-2}px;">
+                <div class="text-[10px] font-bold leading-tight truncate drop-shadow-sm">${startTime.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} - ${title}</div>
+                <div class="text-[9px] leading-tight truncate opacity-90 mt-0.5">${sub}</div>
+            </div>`;
+        }
+
+        function openAppointmentFromCalendar(isoDateTime) {
+            closeModal('slotChoiceModal');
+            openAppointmentModalWithData('', '', '', '', isoDateTime);
+        }
+
+        function openRecordFromCalendar(isoDateTime) {
+            closeModal('slotChoiceModal');
+            openNewRecordModal(isoDateTime);
+        }
+
+        // Ajandada boş bir saate tıklanınca "Randevu mu, Hasta Kaydı mı?" seçimi sunar
+        function openSlotChoice(isoDateTime) {
+            pendingSlotDateTime = isoDateTime;
+            const d = new Date(isoDateTime);
+            document.getElementById('slotChoiceLabel').innerText = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' - ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            openModal('slotChoiceModal');
+        }
+
+        dbClient.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                handleAuthSuccess();
+            } else {
+                document.getElementById('loginSection').classList.remove('hidden');
+                document.getElementById('appSection').classList.add('hidden');
+            }
+        });
+    </script>
+<script>
+
+let fpRecordTarih, fpRecordBitis, fpDogumTarihi, fpAppTarih, fpAppBitis, fpAppDogumTarihi;
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.flatpickr) {
+    try {
+      if (flatpickr.l10ns && flatpickr.l10ns.tr) flatpickr.localize(flatpickr.l10ns.tr);
+    } catch (e) {}
+    // Safari: kendi takvimini kullan (native iOS date picker format farkları sorun çıkarıyor)
+    const timeConfig = { 
+      enableTime: true, 
+      time_24hr: true, 
+      dateFormat: "Y-m-d H:i", 
+      minuteIncrement: 15,
+      disableMobile: true,
+      allowInput: true,
+      clickOpens: true
+    };
+    const dateConfig = { 
+      dateFormat: "Y-m-d", 
+      allowInput: true,
+      disableMobile: true
+    };
+    try {
+      fpRecordTarih = flatpickr("#recordTarih", timeConfig);
+      fpRecordBitis = flatpickr("#recordBitis", timeConfig);
+      fpAppTarih = flatpickr("#appTarih", timeConfig);
+      fpAppBitis = flatpickr("#appBitis", timeConfig);
+      fpDogumTarihi = flatpickr("#dogumTarihi", dateConfig);
+      fpAppDogumTarihi = flatpickr("#appDogumTarihi", dateConfig);
+    } catch (e) { console.error('Flatpickr hata:', e); }
+  }
+});
+
+</script>
+</body>
+</html>
