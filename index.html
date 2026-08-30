@@ -78,8 +78,7 @@
         }
         .flatpickr-day, .flatpickr-time input { font-size: 16px !important; }
         
-        /* Safari: flex + hidden düzgün çalışsın */
-        .hidden { display: none !important; }
+        /* .hidden Tailwind CDN tarafından yönetilir — !important kullanma */
 
         /* DARK MODE - Derin, kontrastlı gece paleti */
         body.dark-mode { background-color: #0b0c0f; color: #e4e4e7; background-image: radial-gradient(circle at top left, rgba(220,38,38,0.06), transparent 40%), radial-gradient(circle at bottom right, rgba(59,130,246,0.05), transparent 45%); background-attachment: fixed; }
@@ -1599,7 +1598,7 @@ Not: ${r.aciklama || '-'}`;
 
         // MOTOR RENDER ALTYAPISI - TAM ENTEGRE GÖRÜNÜM
         function renderData() {
-            calculateGlobalStats();
+            try { calculateGlobalStats(); } catch (e) { console.error(e); }
             const noData = document.getElementById('noDataMessage');
             const paginationCtrl = document.getElementById('paginationContainer');
             let totalItemsCount = 0;
@@ -1609,6 +1608,11 @@ Not: ${r.aciklama || '-'}`;
             const mobileContainer = document.getElementById('mobileCardsContainer');
             const appBody = document.getElementById('appointmentsTableBody');
             const mobileAppContainer = document.getElementById('mobileAppointmentsContainer');
+
+            if (!desktopBody || !mobileContainer || !appBody || !mobileAppContainer) {
+                console.error('Liste DOM elemanları bulunamadı');
+                return;
+            }
 
             desktopBody.innerHTML = '';
             mobileContainer.innerHTML = '';
@@ -1625,7 +1629,7 @@ Not: ${r.aciklama || '-'}`;
                 });
 
                 if(searchQuery) {
-                    filtered = filtered.filter(r => r.hasta_adi.toLowerCase().includes(searchQuery));
+                    filtered = filtered.filter(r => r.hasta_adi && r.hasta_adi.toLowerCase().includes(searchQuery));
                 }
 
                 totalItemsCount = filtered.length;
@@ -1720,10 +1724,10 @@ Not: ${r.aciklama || '-'}`;
                             </div>
                         </div>`;
                 });
-            } else {
+            } else if (activeTab === 'appointments') {
                 let filteredApp = appointments;
                 if(searchQuery) {
-                    filteredApp = filteredApp.filter(a => a.hasta_adi.toLowerCase().includes(searchQuery));
+                    filteredApp = filteredApp.filter(a => a.hasta_adi && a.hasta_adi.toLowerCase().includes(searchQuery));
                 }
 
                 totalItemsCount = filteredApp.length;
