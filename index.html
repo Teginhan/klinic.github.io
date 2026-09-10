@@ -776,7 +776,82 @@
             return new Date(start.getTime() + mins * 60000).toISOString();
         }
 
+        // Zaman aralığı çakışma kontrolü (randevu + hasta kaydı)
+        // excludeType/excludeId: düzenlenen kayıt kendisiyle çakışmasın
+        // alsoExcludeAppId: randevudan kayda dönüştürülürken o randevuyu yok say
+        function findScheduleConflicts(startISO, endISO, excludeType, excludeId, alsoExcludeAppId) {
+            const newStart = parseSafeDate(startISO).getTime();
+            const newEnd = parseSafeDate(endISO).getTime();
+            if (isNaN(newStart) || isNaN(newEnd) || newEnd <= newStart) return [];
+
+            const conflicts = [];
+
+            function pushConflict(tip, hasta, islem, s, e) {
+                // Çakışan süre (dakika)
+                const overlapMs = Math.min(newEnd, e) - Math.max(newStart, s);
+                const overlapMins = Math.max(1, Math.ceil(overlapMs / 60000));
+                // Süre adımı 15 dk olduğu için pratik öneri (yukarı yuvarla)
+                const suggestStep = Math.ceil(overlapMins / 15) * 15;
+                const sStr = new Date(s).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const eStr = new Date(e).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                conflicts.push({
+                    tip: tip,
+                    hasta: hasta || '-',
+                    islem: islem || '-',
+                    zaman: sStr + ' – ' + eStr,
+                    overlapMins: overlapMins,
+                    suggestStep: suggestStep
+                });
+            }
+
+            (appointments || []).forEach(a => {
+                if (excludeType === 'app' && String(a.id) === String(excludeId)) return;
+                if (alsoExcludeAppId && String(a.id) === String(alsoExcludeAppId)) return;
+                const s = parseSafeDate(a.tarih).getTime();
+                let e = a.bitis_tarihi ? parseSafeDate(a.bitis_tarihi).getTime() : (s + 15 * 60000);
+                if (isNaN(s) || isNaN(e)) return;
+                if (e <= s) e = s + 15 * 60000;
+                // Çakışma: yeni başlangıç < mevcut bitiş VE yeni bitiş > mevcut başlangıç
+                if (newStart < e && newEnd > s) {
+                    pushConflict('Randevu', a.hasta_adi, a.yapilan_islem, s, e);
+                }
+            });
+
+            (records || []).forEach(r => {
+                if (excludeType === 'record' && String(r.id) === String(excludeId)) return;
+                const s = parseSafeDate(r.created_at).getTime();
+                let e = r.bitis_tarihi ? parseSafeDate(r.bitis_tarihi).getTime() : (s + 15 * 60000);
+                if (isNaN(s) || isNaN(e)) return;
+                if (e <= s) e = s + 15 * 60000;
+                if (newStart < e && newEnd > s) {
+                    pushConflict('Hasta Kaydı', r.hasta_adi, r.yapilan_islem, s, e);
+                }
+            });
+
+            return conflicts;
+        }
+
+        function formatConflictMessage(conflicts) {
+            if (!conflicts || conflicts.length === 0) return '';
+            const lines = conflicts.map((c, i) =>
+                (i + 1) + ') [' + c.tip + '] ' + c.hasta +
+                '\n   İşlem: ' + c.islem +
+                '\n   Zaman: ' + c.zaman +
+                '\n   Çakışan süre: ' + c.overlapMins + ' dk' +
+                '\n   Öneri: Tedavi süresini en az ' + c.suggestStep + ' dk azaltın veya başlangıç saatini değiştirin.'
+            );
+            const maxOverlap = conflicts.reduce((m, c) => Math.max(m, c.overlapMins || 0), 0);
+            const maxSuggest = Math.ceil(maxOverlap / 15) * 15;
+            return '⚠️ Seçilen zaman aralığında çakışan kayıt var!\n\n' +
+                lines.join('\n\n') +
+                '\n\nToplam en uzun çakışma: ' + maxOverlap + ' dk.' +
+                (maxSuggest > 0 ? ('\nSüre adımına göre en az ' + maxSuggest + ' dk azaltın veya farklı bir saat seçin.') : '') +
+                '\nİç içe / çakışan kayıt oluşturulamaz.';
+        }
+
+
         // Global Değişkenler
+
 
         let records = [];
         let appointments = [];
@@ -1297,6 +1372,19 @@
             // Bitiş = başlangıç + tedavi süresi (dakika)
             const bitis_tarihi = computeBitisISO(inputVal, 'record');
 
+            // Çakışma kontrolü (düzenlenen kayıt ve dönüştürülen randevu hariç)
+            const conflicts = findScheduleConflicts(
+                secilenTarih,
+                bitis_tarihi,
+                'record',
+                editingId || null,
+                convertedAppId || null
+            );
+            if (conflicts.length > 0) {
+                alert(formatConflictMessage(conflicts));
+                return;
+            }
+
             const payload = {
                 hasta_adi: document.getElementById('hastaAdi').value.trim(),
                 tc_kimlik: document.getElementById('hastaTc').value.trim(),
@@ -1313,7 +1401,6 @@
                 bitis_tarihi: bitis_tarihi
             };
 
-
             if (editingId) {
                 await dbClient.from('records').update(payload).eq('id', editingId);
             } else {
@@ -1326,6 +1413,7 @@
             fetchDataFromCloud();
         }
 
+
         async function saveAppointment(e) {
             e.preventDefault();
             const editingId = document.getElementById('editingAppId').value;
@@ -1334,6 +1422,19 @@
             const targetIsoDate = toSafeISO(localInputVal);
             // Bitiş = başlangıç + tedavi süresi (dakika)
             const bitis_tarihi = computeBitisISO(localInputVal, 'app');
+
+            // Çakışma kontrolü (düzenlenen randevu hariç)
+            const conflicts = findScheduleConflicts(
+                targetIsoDate,
+                bitis_tarihi,
+                'app',
+                editingId || null,
+                null
+            );
+            if (conflicts.length > 0) {
+                alert(formatConflictMessage(conflicts));
+                return;
+            }
 
             const payload = {
                 hasta_adi: document.getElementById('appHastaAdi').value.trim(),
@@ -1345,7 +1446,6 @@
                 yapilan_islem: document.getElementById('appIslem').value.trim()
             };
 
-
             if(editingId) {
                 await dbClient.from('appointments').update(payload).eq('id', editingId);
             } else {
@@ -1354,6 +1454,7 @@
             closeModal('appointmentModal');
             fetchDataFromCloud();
         }
+
 
         function openEditRecord(id) {
             const r = records.find(rec => rec.id == id);
