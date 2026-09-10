@@ -1207,10 +1207,16 @@
         function convertAppointmentToRecord(appId) {
             const app = appointments.find(a => a.id == appId);
             if (!app) return;
+            // Zaten dönüştürülüyor veya kayıt işlemi sürüyorsa engelle
+            if (_convertingAppIds.has(String(app.id)) || _isSavingRecord) {
+                alert('Bu randevu zaten muayeneye alınıyor. Lütfen bekleyin.');
+                return;
+            }
 
             document.getElementById('recordForm').reset();
             document.getElementById('editingRecordId').value = '';
             document.getElementById('convertedFromAppId').value = app.id;
+
             
             document.getElementById('hastaAdi').value = app.hasta_adi;
             document.getElementById('hastaTc').value = app.tc_kimlik || '';
@@ -1356,12 +1362,23 @@
 
 
 
-        async function saveRecord(e) {
+        // Çift tıklama / paralel kayıt engeli
+        let _isSavingRecord = false;
+        let _isSavingAppointment = false;
+        const _convertingAppIds = new Set(); // Muayeneye alınan randevular (işlem bitene kadar)
 
+        async function saveRecord(e) {
             e.preventDefault();
+            if (_isSavingRecord) return; // Çift kayıt engeli
+
             const editingId = document.getElementById('editingRecordId').value;
             const convertedAppId = document.getElementById('convertedFromAppId').value;
-            
+
+            // Aynı randevu zaten dönüştürülüyorsa tekrar kayıt açma
+            if (convertedAppId && _convertingAppIds.has(String(convertedAppId))) {
+                return;
+            }
+
             const odenen = Math.abs(parseFloat(document.getElementById('odenenMiktar').value)) || 0;
             const gider = Math.abs(parseFloat(document.getElementById('digerGiderler').value)) || 0;
             const netMatrah = odenen - gider;
@@ -1385,6 +1402,17 @@
                 return;
             }
 
+            // Randevudan dönüşümde randevu hâlâ var mı kontrol et
+            if (!editingId && convertedAppId) {
+                const stillExists = (appointments || []).some(a => String(a.id) === String(convertedAppId));
+                if (!stillExists) {
+                    alert('Bu randevu zaten muayeneye alınmış. Tekrar kayıt oluşturulamaz.');
+                    closeModal('recordModal');
+                    fetchDataFromCloud();
+                    return;
+                }
+            }
+
             const payload = {
                 hasta_adi: document.getElementById('hastaAdi').value.trim(),
                 tc_kimlik: document.getElementById('hastaTc').value.trim(),
@@ -1401,21 +1429,47 @@
                 bitis_tarihi: bitis_tarihi
             };
 
-            if (editingId) {
-                await dbClient.from('records').update(payload).eq('id', editingId);
-            } else {
-                await dbClient.from('records').insert([payload]);
-                if(convertedAppId) {
-                    await dbClient.from('appointments').delete().eq('id', convertedAppId);
+            _isSavingRecord = true;
+            if (convertedAppId) _convertingAppIds.add(String(convertedAppId));
+            // Kaydet butonunu kilitle
+            const submitBtn = e.target && e.target.querySelector ? e.target.querySelector('button[type="submit"]') : null;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.dataset.prevText = submitBtn.textContent;
+                submitBtn.textContent = 'Kaydediliyor...';
+            }
+
+            try {
+                if (editingId) {
+                    await dbClient.from('records').update(payload).eq('id', editingId);
+                } else {
+                    await dbClient.from('records').insert([payload]);
+                    if (convertedAppId) {
+                        await dbClient.from('appointments').delete().eq('id', convertedAppId);
+                        // Formdaki dönüşüm id'sini hemen temizle (çift kayıt engeli)
+                        document.getElementById('convertedFromAppId').value = '';
+                    }
+                }
+                closeModal('recordModal');
+                await fetchDataFromCloud();
+            } catch (err) {
+                console.error('Kayıt hatası:', err);
+                alert('Kayıt sırasında hata oluştu. Lütfen tekrar deneyin.');
+            } finally {
+                _isSavingRecord = false;
+                if (convertedAppId) _convertingAppIds.delete(String(convertedAppId));
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = submitBtn.dataset.prevText || 'Kaydet';
                 }
             }
-            closeModal('recordModal');
-            fetchDataFromCloud();
         }
 
 
         async function saveAppointment(e) {
             e.preventDefault();
+            if (_isSavingAppointment) return; // Çift randevu engeli
+
             const editingId = document.getElementById('editingAppId').value;
 
             const localInputVal = document.getElementById('appTarih').value; 
@@ -1446,14 +1500,38 @@
                 yapilan_islem: document.getElementById('appIslem').value.trim()
             };
 
-            if(editingId) {
-                await dbClient.from('appointments').update(payload).eq('id', editingId);
-            } else {
-                await dbClient.from('appointments').insert([payload]);
+            _isSavingAppointment = true;
+            const submitBtn = e.target && e.target.querySelector ? e.target.querySelector('button[type="submit"]') : null;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.dataset.prevText = submitBtn.textContent;
+                submitBtn.textContent = 'Kaydediliyor...';
             }
-            closeModal('appointmentModal');
-            fetchDataFromCloud();
+            // Muayeneye Al butonunu da kilitle
+            const convertBtn = document.getElementById('convertAppBtn');
+            if (convertBtn) convertBtn.disabled = true;
+
+            try {
+                if (editingId) {
+                    await dbClient.from('appointments').update(payload).eq('id', editingId);
+                } else {
+                    await dbClient.from('appointments').insert([payload]);
+                }
+                closeModal('appointmentModal');
+                await fetchDataFromCloud();
+            } catch (err) {
+                console.error('Randevu kayıt hatası:', err);
+                alert('Randevu kaydı sırasında hata oluştu. Lütfen tekrar deneyin.');
+            } finally {
+                _isSavingAppointment = false;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = submitBtn.dataset.prevText || 'Randevuyu Kaydet';
+                }
+                if (convertBtn) convertBtn.disabled = false;
+            }
         }
+
 
 
         function openEditRecord(id) {
@@ -1514,10 +1592,16 @@
                 alert('Randevu bulunamadı!');
                 return;
             }
+            // Zaten dönüştürülüyor veya kayıt işlemi sürüyorsa engelle
+            if (_convertingAppIds.has(String(a.id)) || _isSavingRecord) {
+                alert('Bu randevu zaten muayeneye alınıyor. Lütfen bekleyin.');
+                return;
+            }
 
             // Randevu verilerini record formuna aktar
             document.getElementById('editingRecordId').value = '';
             document.getElementById('convertedFromAppId').value = a.id;
+
             document.getElementById('hastaAdi').value = a.hasta_adi;
             document.getElementById('hastaTc').value = a.tc_kimlik || '';
             document.getElementById('hastaTelefon').value = a.iletisim || '';
