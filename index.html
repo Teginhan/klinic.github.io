@@ -478,10 +478,14 @@
 
     <div id="recordModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
         <div class="bg-modal border border-custom rounded-t-2xl sm:rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col" style="padding-bottom: env(safe-area-inset-bottom);">
-            <div class="bg-gradient-to-r from-red-500/10 via-transparent to-transparent p-4 border-b border-custom flex justify-between items-center shrink-0">
-                <h3 id="modalTitle" class="text-sm font-bold text-title tracking-wide uppercase">YENİ HASTA KAYDI</h3>
-                <button onclick="closeModal('recordModal')" class="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 text-xl font-bold transition">&times;</button>
+            <div class="bg-gradient-to-r from-red-500/10 via-transparent to-transparent p-4 border-b border-custom flex justify-between items-center shrink-0 gap-2">
+                <h3 id="modalTitle" class="text-sm font-bold text-title tracking-wide uppercase flex-1 min-w-0 truncate">YENİ HASTA KAYDI</h3>
+                <div id="recordHeaderActions" class="hidden items-center gap-1.5 shrink-0" style="display: none;">
+                    <button type="button" onclick="deleteRecordFromModal()" class="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition whitespace-nowrap" title="Kaydı Sil">🗑️ Sil</button>
+                </div>
+                <button onclick="closeModal('recordModal')" class="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 text-xl font-bold transition shrink-0">&times;</button>
             </div>
+
             <form id="recordForm" onsubmit="saveRecord(event)" class="p-4 space-y-3 overflow-y-auto flex-1" style="-webkit-overflow-scrolling: touch;">
                 <input type="hidden" id="editingRecordId">
                 <input type="hidden" id="convertedFromAppId">
@@ -492,10 +496,20 @@
                         <input type="text" id="recordTarih" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Bitiş Tarihi</label>
-                        <input type="text" id="recordBitis" placeholder="Seçilmezse +15dk" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Tedavi Süresi</label>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="adjustDuration('record', -15)" class="w-10 h-10 shrink-0 rounded-lg bg-zinc-500/10 border border-custom text-title font-bold text-sm hover:bg-zinc-500/20 transition">−</button>
+                            <div class="flex-1 text-center input-custom rounded-lg px-2 py-2 text-sm font-bold text-title">
+                                <span id="recordDurationLabel">15 dk</span>
+                                <input type="hidden" id="recordDuration" value="15">
+                            </div>
+                            <button type="button" onclick="adjustDuration('record', 15)" class="w-10 h-10 shrink-0 rounded-lg bg-zinc-500/10 border border-custom text-title font-bold text-sm hover:bg-zinc-500/20 transition">+</button>
+                        </div>
+                        <!-- Gizli: uyumluluk için (JS bitiş hesaplar) -->
+                        <input type="hidden" id="recordBitis">
                     </div>
                 </div>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Hasta Adı Soyadı *</label>
@@ -509,7 +523,8 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">TC Kimlik No</label>
-                        <input type="text" id="hastaTc" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="11 Haneli TC" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                        <input type="text" id="hastaTc" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, ''); lookupPatientByTc(this.value, 'record')" onblur="lookupPatientByTc(this.value, 'record')" placeholder="11 Haneli TC" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+
                     </div>
                     <div>
                         <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Doğum Tarihi</label>
@@ -571,7 +586,8 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">TC Kimlik No</label>
-                        <input type="text" id="appHastaTc" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, ''); lookupPatientByTc(this.value)" onblur="lookupPatientByTc(this.value)" placeholder="11 Haneli TC" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                        <input type="text" id="appHastaTc" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, ''); lookupPatientByTc(this.value, 'app')" onblur="lookupPatientByTc(this.value, 'app')" placeholder="11 Haneli TC" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+
 
                     </div>
                     <div>
@@ -589,10 +605,19 @@
                         <input type="text" id="appTarih" required class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Bitiş Zamanı</label>
-                        <input type="text" id="appBitis" placeholder="Seçilmezse +15dk" class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
+                        <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Tedavi Süresi</label>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="adjustDuration('app', -15)" class="w-10 h-10 shrink-0 rounded-lg bg-zinc-500/10 border border-custom text-title font-bold text-sm hover:bg-zinc-500/20 transition">−</button>
+                            <div class="flex-1 text-center input-custom rounded-lg px-2 py-2 text-sm font-bold text-title">
+                                <span id="appDurationLabel">15 dk</span>
+                                <input type="hidden" id="appDuration" value="15">
+                            </div>
+                            <button type="button" onclick="adjustDuration('app', 15)" class="w-10 h-10 shrink-0 rounded-lg bg-zinc-500/10 border border-custom text-title font-bold text-sm hover:bg-zinc-500/20 transition">+</button>
+                        </div>
+                        <input type="hidden" id="appBitis">
                     </div>
                 </div>
+
                 <div>
                     <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Planlanan İşlem</label>
                     <input type="text" id="appIslem" list="islemlerListesi" placeholder="Planlanan işlemi seçin veya yazın..." class="w-full input-custom rounded-lg px-3 py-2 text-sm focus:outline-none">
@@ -714,7 +739,45 @@
             return d.toISOString();
         }
 
+        // Tedavi süresi (dakika) yardımcıları — bitiş tarihi UI'da yok, süre ile hesaplanır
+        function setDurationMinutes(kind, minutes) {
+            minutes = parseInt(minutes, 10);
+            if (isNaN(minutes) || minutes < 15) minutes = 15;
+            if (minutes > 480) minutes = 480;
+            minutes = Math.round(minutes / 15) * 15;
+            if (minutes < 15) minutes = 15;
+            const input = document.getElementById(kind + 'Duration');
+            const label = document.getElementById(kind + 'DurationLabel');
+            if (input) input.value = String(minutes);
+            if (label) label.innerText = minutes + ' dk';
+        }
+        function adjustDuration(kind, delta) {
+            const input = document.getElementById(kind + 'Duration');
+            const current = parseInt(input && input.value ? input.value : '15', 10) || 15;
+            setDurationMinutes(kind, current + delta);
+        }
+        function getDurationMinutes(kind) {
+            const input = document.getElementById(kind + 'Duration');
+            const v = parseInt(input && input.value ? input.value : '15', 10);
+            return (isNaN(v) || v < 15) ? 15 : v;
+        }
+        function durationFromDates(startVal, endVal) {
+            const s = parseSafeDate(startVal);
+            const e = parseSafeDate(endVal);
+            if (isNaN(s.getTime()) || isNaN(e.getTime())) return 15;
+            let mins = Math.round((e - s) / 60000);
+            if (mins < 15) mins = 15;
+            return Math.round(mins / 15) * 15;
+        }
+        function computeBitisISO(startVal, kind) {
+            const start = parseSafeDate(startVal);
+            const mins = getDurationMinutes(kind);
+            if (isNaN(start.getTime())) return new Date(Date.now() + mins * 60000).toISOString();
+            return new Date(start.getTime() + mins * 60000).toISOString();
+        }
+
         // Global Değişkenler
+
         let records = [];
         let appointments = [];
         let currentFilter = 'all';
@@ -951,16 +1014,19 @@
             document.getElementById('hastaTc').value = '';
             if (fpDogumTarihi) fpDogumTarihi.clear();
             document.getElementById('digerGiderler').value = 0;
+            if (typeof _tcWarnedSet !== 'undefined') _tcWarnedSet.clear();
 
             const startD = presetDate ? new Date(presetDate) : new Date();
-            const endD = new Date(startD.getTime() + 15*60000);
-
             if (fpRecordTarih) fpRecordTarih.setDate(startD, true);
-            if (fpRecordBitis) fpRecordBitis.setDate(endD, true);
+            setDurationMinutes('record', 15);
 
             document.getElementById('modalTitle').innerText = 'YENİ HASTA KAYDI';
+            const headerActions = document.getElementById('recordHeaderActions');
+            if (headerActions) { headerActions.classList.add('hidden'); headerActions.style.display = 'none'; }
             openModal('recordModal');
         }
+
+
 
         function openAppointmentModalWithData(name = '', phone = '', tc = '', bdate = '', presetDate = null) {
             document.getElementById('appointmentForm').reset();
@@ -974,10 +1040,8 @@
             if (fpAppDogumTarihi) { if (bdate) fpAppDogumTarihi.setDate(bdate, true); else fpAppDogumTarihi.clear(); }
 
             const startD = presetDate ? new Date(presetDate) : new Date();
-            const endD = new Date(startD.getTime() + 15*60000);
-
             if (fpAppTarih) fpAppTarih.setDate(startD, true);
-            if (fpAppBitis) fpAppBitis.setDate(endD, true);
+            setDurationMinutes('app', 15);
             
             document.getElementById('appointmentModalTitle').innerText = 'YENİ RANDEVU OLUŞTUR';
             // Yeni randevu: header aksiyonları ve muayene butonu gizli
@@ -988,6 +1052,7 @@
             if (!presetDate) switchTab('appointments');
             openModal('appointmentModal');
         }
+
 
 
 
@@ -1082,17 +1147,18 @@
             
             const rDate = app.tarih ? new Date(app.tarih) : new Date();
             if (fpRecordTarih) fpRecordTarih.setDate(rDate, true);
-            
-            // Bitiş tarihini de kopyala (yoksa +15dk)
-            const eDate = app.bitis_tarihi ? new Date(app.bitis_tarihi) : new Date(rDate.getTime() + 15*60000);
-            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+            setDurationMinutes('record', app.bitis_tarihi ? durationFromDates(app.tarih, app.bitis_tarihi) : 15);
 
             document.getElementById('modalTitle').innerText = 'RANDEVUYU KAYDA DÖNÜŞTÜR';
+            const headerActions = document.getElementById('recordHeaderActions');
+            if (headerActions) { headerActions.classList.add('hidden'); headerActions.style.display = 'none'; }
             switchTab('records');
             openModal('recordModal');
         }
 
         function sendWhatsAppReminder(appId) {
+
+
             const a = appointments.find(app => app.id == appId);
             if (!a || !a.iletisim) return alert("Telefon numarası bulunamadı.");
             
@@ -1133,11 +1199,13 @@
         }
 
         // TC Kimlik ile hasta bilgisi otomatik doldurma (kayıtlar + randevular)
+        // target: 'app' (randevu formu) | 'record' (hasta kaydı formu)
         let _tcLookupTimer = null;
         let _tcWarnedSet = new Set(); // Aynı TC için uyarıyı sadece 1 kez göster
-        function lookupPatientByTc(tcRaw) {
+        function lookupPatientByTc(tcRaw, target) {
             const tc = (tcRaw || '').replace(/\D/g, '').trim();
             if (tc.length !== 11) return;
+            target = target === 'record' ? 'record' : 'app';
 
             // Debounce: hızlı yazarken gereksiz aramayı engelle
             if (_tcLookupTimer) clearTimeout(_tcLookupTimer);
@@ -1169,18 +1237,29 @@
                 }
 
                 if (found) {
-                    if (found.ad) document.getElementById('appHastaAdi').value = found.ad;
-                    if (found.tel) document.getElementById('appIletisim').value = found.tel;
-                    if (found.dogum && fpAppDogumTarihi) {
-                        fpAppDogumTarihi.setDate(found.dogum, true);
+                    if (target === 'record') {
+                        if (found.ad) document.getElementById('hastaAdi').value = found.ad;
+                        if (found.tel) document.getElementById('hastaTelefon').value = found.tel;
+                        if (found.dogum && fpDogumTarihi) {
+                            fpDogumTarihi.setDate(found.dogum, true);
+                        }
+                    } else {
+                        if (found.ad) document.getElementById('appHastaAdi').value = found.ad;
+                        if (found.tel) document.getElementById('appIletisim').value = found.tel;
+                        if (found.dogum && fpAppDogumTarihi) {
+                            fpAppDogumTarihi.setDate(found.dogum, true);
+                        }
                     }
                     // Bu TC için uyarı geçmişini temizle (sonradan bulunmuş olabilir)
                     _tcWarnedSet.delete(tc);
                 } else {
-                    // Sadece yeni randevu oluştururken ve bu TC için daha önce uyarı verilmediyse
-                    const isNew = !document.getElementById('editingAppId').value;
+                    // Sadece yeni kayıt/randevu oluştururken ve bu TC için daha önce uyarı verilmediyse
+                    const isNew = target === 'record'
+                        ? !document.getElementById('editingRecordId').value
+                        : !document.getElementById('editingAppId').value;
                     if (isNew && !_tcWarnedSet.has(tc)) {
-                        const adVal = (document.getElementById('appHastaAdi').value || '').trim();
+                        const adId = target === 'record' ? 'hastaAdi' : 'appHastaAdi';
+                        const adVal = (document.getElementById(adId).value || '').trim();
                         if (!adVal) {
                             _tcWarnedSet.add(tc);
                             alert('Bu TC kimlik numarasına ait hasta bilgisi bulunamadı. Lütfen bilgileri manuel olarak giriniz.');
@@ -1189,6 +1268,17 @@
                 }
             }, 400);
         }
+
+        async function deleteRecordFromModal() {
+            const recordId = document.getElementById('editingRecordId').value;
+            if (!recordId) return alert('Kayıt bilgisi bulunamadı.');
+            if (confirm('Bu hasta kaydı silinecektir. Emin misiniz?')) {
+                await dbClient.from('records').delete().eq('id', recordId);
+                closeModal('recordModal');
+                fetchDataFromCloud();
+            }
+        }
+
 
 
         async function saveRecord(e) {
@@ -1204,15 +1294,8 @@
             
             const inputVal = document.getElementById('recordTarih').value;
             const secilenTarih = toSafeISO(inputVal);
-            
-            // Bitiş tarihi - seçilmezse +15 dakika otomatik ekle
-            let bitis_tarihi = null;
-            const bitisVal = document.getElementById('recordBitis').value;
-            if(bitisVal) {
-                bitis_tarihi = toSafeISO(bitisVal);
-            } else {
-                bitis_tarihi = new Date(parseSafeDate(inputVal).getTime() + 15*60000).toISOString();
-            }
+            // Bitiş = başlangıç + tedavi süresi (dakika)
+            const bitis_tarihi = computeBitisISO(inputVal, 'record');
 
             const payload = {
                 hasta_adi: document.getElementById('hastaAdi').value.trim(),
@@ -1229,6 +1312,7 @@
                 created_at: secilenTarih,
                 bitis_tarihi: bitis_tarihi
             };
+
 
             if (editingId) {
                 await dbClient.from('records').update(payload).eq('id', editingId);
@@ -1248,15 +1332,8 @@
 
             const localInputVal = document.getElementById('appTarih').value; 
             const targetIsoDate = toSafeISO(localInputVal);
-            
-            // Bitiş tarihi - seçilmezse +15 dakika otomatik ekle
-            let bitis_tarihi = null;
-            const bitisVal = document.getElementById('appBitis').value;
-            if(bitisVal) {
-                bitis_tarihi = toSafeISO(bitisVal);
-            } else {
-                bitis_tarihi = new Date(parseSafeDate(localInputVal).getTime() + 15*60000).toISOString();
-            }
+            // Bitiş = başlangıç + tedavi süresi (dakika)
+            const bitis_tarihi = computeBitisISO(localInputVal, 'app');
 
             const payload = {
                 hasta_adi: document.getElementById('appHastaAdi').value.trim(),
@@ -1267,6 +1344,7 @@
                 bitis_tarihi: bitis_tarihi, 
                 yapilan_islem: document.getElementById('appIslem').value.trim()
             };
+
 
             if(editingId) {
                 await dbClient.from('appointments').update(payload).eq('id', editingId);
@@ -1294,16 +1372,16 @@
             
             const rDate = new Date(r.created_at);
             if (fpRecordTarih) fpRecordTarih.setDate(rDate, true);
-            
-            // Bitiş tarihi (yoksa +15dk)
-            const eDate = r.bitis_tarihi ? new Date(r.bitis_tarihi) : new Date(rDate.getTime() + 15*60000);
-            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+            setDurationMinutes('record', r.bitis_tarihi ? durationFromDates(r.created_at, r.bitis_tarihi) : 15);
 
             document.getElementById('modalTitle').innerText = 'KAYDI DÜZENLE';
+            const headerActions = document.getElementById('recordHeaderActions');
+            if (headerActions) { headerActions.classList.remove('hidden'); headerActions.style.display = 'flex'; }
             openModal('recordModal');
         }
 
         function openEditAppointment(id) {
+
             const a = appointments.find(app => app.id == id);
             if (!a) return;
             document.getElementById('editingAppId').value = a.id;
@@ -1314,10 +1392,7 @@
             
             const tDate = new Date(a.tarih);
             if (fpAppTarih) fpAppTarih.setDate(tDate, true);
-            
-            // Bitiş tarihi (yoksa +15dk)
-            const eDate = a.bitis_tarihi ? new Date(a.bitis_tarihi) : new Date(tDate.getTime() + 15*60000);
-            if (fpAppBitis) fpAppBitis.setDate(eDate, true);
+            setDurationMinutes('app', a.bitis_tarihi ? durationFromDates(a.tarih, a.bitis_tarihi) : 15);
             
             document.getElementById('appIslem').value = a.yapilan_islem || '';
             document.getElementById('appointmentModalTitle').innerText = 'RANDEVU DÜZENLE';
@@ -1328,6 +1403,7 @@
             if (convertBtn) convertBtn.classList.remove('hidden');
             openModal('appointmentModal');
         }
+
 
 
 
@@ -1349,9 +1425,7 @@
             // Tarihler
             const tDate = new Date(a.tarih);
             if (fpRecordTarih) fpRecordTarih.setDate(tDate, true);
-            
-            const eDate = a.bitis_tarihi ? new Date(a.bitis_tarihi) : new Date(tDate.getTime() + 15*60000);
-            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+            setDurationMinutes('record', a.bitis_tarihi ? durationFromDates(a.tarih, a.bitis_tarihi) : 15);
 
             // Doğum tarihi
             if (fpDogumTarihi) { 
@@ -1368,10 +1442,13 @@
             // Modalları değiştir
             closeModal('appointmentModal');
             document.getElementById('modalTitle').innerText = 'MUAYENEYE AL';
+            const headerActions = document.getElementById('recordHeaderActions');
+            if (headerActions) { headerActions.classList.add('hidden'); headerActions.style.display = 'none'; }
             openModal('recordModal');
         }
 
         function openMuayeneModal(isoDateTime) {
+
             // Boş record formu aç ama tarih doldurulmuş
             closeModal('slotChoiceModal');
             document.getElementById('editingRecordId').value = '';
@@ -1389,14 +1466,18 @@
 
             const d = new Date(isoDateTime);
             if (fpRecordTarih) fpRecordTarih.setDate(d, true);
-            const eDate = new Date(d.getTime() + 15*60000);
-            if (fpRecordBitis) fpRecordBitis.setDate(eDate, true);
+            setDurationMinutes('record', 15);
+            if (typeof _tcWarnedSet !== 'undefined') _tcWarnedSet.clear();
 
             document.getElementById('modalTitle').innerText = 'MUAYENEYE AL';
+            const headerActions = document.getElementById('recordHeaderActions');
+            if (headerActions) { headerActions.classList.add('hidden'); headerActions.style.display = 'none'; }
             openModal('recordModal');
         }
 
+
         function openRecordWithAppointmentOption(recordId) {
+
             const r = records.find(rec => rec.id == recordId);
             if (!r) return;
             
@@ -1447,9 +1528,8 @@ Not: ${r.aciklama || '-'}`;
             // Tarih, kaydın yapıldığı zaman olarak başlat
             const rDate = new Date(r.created_at);
             if (fpAppTarih) fpAppTarih.setDate(rDate, true);
-            
-            const eDate = r.bitis_tarihi ? new Date(r.bitis_tarihi) : new Date(rDate.getTime() + 15*60000);
-            if (fpAppBitis) fpAppBitis.setDate(eDate, true);
+            setDurationMinutes('app', r.bitis_tarihi ? durationFromDates(r.created_at, r.bitis_tarihi) : 15);
+
             
             document.getElementById('appointmentModalTitle').innerText = 'RANDEVU OLUŞTUR';
             const headerActions = document.getElementById('appointmentHeaderActions');
@@ -2212,14 +2292,16 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     try {
       fpRecordTarih = flatpickr("#recordTarih", timeConfig);
-      fpRecordBitis = flatpickr("#recordBitis", timeConfig);
+      // Bitiş tarihi artık UI'da yok; tedavi süresi ile hesaplanıyor
+      fpRecordBitis = null;
       fpAppTarih = flatpickr("#appTarih", timeConfig);
-      fpAppBitis = flatpickr("#appBitis", timeConfig);
+      fpAppBitis = null;
       fpDogumTarihi = flatpickr("#dogumTarihi", dateConfig);
       fpAppDogumTarihi = flatpickr("#appDogumTarihi", dateConfig);
     } catch (e) { console.error('Flatpickr hata:', e); }
   }
 });
+
 
 </script>
 </body>
